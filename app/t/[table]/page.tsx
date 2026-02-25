@@ -1,30 +1,50 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-type ReqType = 'waiter' | 'bill'
-
 export default function TablePage() {
-  const params = useParams()
-  const token = (params?.table as string) || ''
+  const params = useParams<{ table: string }>()
+  const token = params.table // URL: /t/<TABLE_TOKEN_UUID>
 
-  const [loading, setLoading] = useState<ReqType | null>(null)
-  const [locked, setLocked] = useState(false)
+  const [loading, setLoading] = useState<'waiter' | 'bill' | null>(null)
   const [msg, setMsg] = useState('')
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [tableNumber, setTableNumber] = useState<number | null>(null)
+  const [locked, setLocked] = useState(false)
 
-  const isUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      token
-    )
+  const lockTimer = useRef<any>(null)
+  const toastTimer = useRef<any>(null)
 
   useEffect(() => {
+    const loadTable = async () => {
+      // ✅ URL’de UUID table_token var → DB’de restaurant_tables.table_token ile eşleştir
+      const { data, error } = await supabase
+        .from('restaurant_tables')
+        .select('table_number')
+        .eq('table_token', token)
+        .single()
+
+      if (error) {
+        console.error('loadTable error:', error)
+        return
+      }
+      if (data) setTableNumber(data.table_number)
+    }
+
+    if (token) loadTable()
+
     return () => {
+      if (lockTimer.current) clearTimeout(lockTimer.current)
       if (toastTimer.current) clearTimeout(toastTimer.current)
     }
-  }, [])
+  }, [token])
+
+  const lockForSeconds = (sec: number) => {
+    setLocked(true)
+    if (lockTimer.current) clearTimeout(lockTimer.current)
+    lockTimer.current = setTimeout(() => setLocked(false), sec * 1000)
+  }
 
   const showToast = (text: string, ms = 1700) => {
     setMsg(text)
@@ -32,14 +52,9 @@ export default function TablePage() {
     toastTimer.current = setTimeout(() => setMsg(''), ms)
   }
 
-  const lockForSeconds = (sec: number) => {
-    setLocked(true)
-    setTimeout(() => setLocked(false), sec * 1000)
-  }
-
-  const send = async (type: ReqType) => {
-    if (!isUuid) {
-      showToast('Geçersiz masa linki (token).')
+  const send = async (type: 'waiter' | 'bill') => {
+    if (!token) {
+      showToast('Geçersiz masa linki.')
       return
     }
     if (locked || loading) return
@@ -48,8 +63,8 @@ export default function TablePage() {
     setLoading(type)
 
     const { error } = await supabase.rpc('create_request', {
-      // DİKKAT: fonksiyon argümanı bu isimde olmalı:
-      p_table_token: token, // uuid string
+      // ✅ Function param adı: p_table_token (uuid)
+      p_table_token: token,
       p_request_type: type,
     })
 
@@ -64,76 +79,133 @@ export default function TablePage() {
     showToast(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
   }
 
-  return (
-    <main style={{ padding: 16, maxWidth: 520, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>QR Call</h1>
+  const Card = ({
+    img,
+    title,
+    type,
+  }: {
+    img: string
+    title: string
+    type: 'waiter' | 'bill'
+  }) => {
+    const busy = loading === type
+    const disabled = locked || loading !== null
 
-      <div style={{ marginBottom: 12, opacity: 0.8 }}>
-        Masa linki: <code style={{ fontSize: 12 }}>{token || '(yok)'}</code>
-      </div>
-
-      {!isUuid && (
+    return (
+      <button
+        onClick={() => send(type)}
+        disabled={disabled}
+        style={{
+          width: '100%',
+          background: 'rgba(255,255,255,0.07)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 24,
+          padding: 18,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: 'transform 120ms ease',
+        }}
+        onMouseDown={(e) => {
+          ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)'
+        }}
+        onMouseUp={(e) => {
+          ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
+        }}
+        onMouseLeave={(e) => {
+          ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
+        }}
+      >
         <div
           style={{
-            padding: 12,
-            border: '1px solid #f5c2c7',
-            background: '#fff5f5',
-            borderRadius: 10,
-            marginBottom: 12,
+            width: '100%',
+            height: 'clamp(150px, 22vh, 210px)',
+            borderRadius: 18,
+            overflow: 'hidden',
           }}
         >
-          Bu link geçerli bir UUID token değil. Doğru format:
-          <br />
-          <code>/t/7cbe72df-3cc2-404e-a45a-640315b51d86</code>
+          <img
+            src={img}
+            alt={title}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
         </div>
-      )}
 
-      <div style={{ display: 'grid', gap: 10 }}>
-        <button
-          onClick={() => send('waiter')}
-          disabled={!isUuid || !!loading || locked}
-          style={{
-            padding: '12px 14px',
-            borderRadius: 12,
-            border: '1px solid #ddd',
-            cursor: !isUuid || loading || locked ? 'not-allowed' : 'pointer',
-            fontSize: 16,
-            fontWeight: 600,
-          }}
-        >
-          {loading === 'waiter' ? 'Gönderiliyor...' : '🧑‍🍳 Garson Çağır'}
-        </button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 19, fontWeight: 900, color: 'white' }}>{title}</div>
+          <div style={{ fontSize: 12, opacity: 0.8, color: 'white', marginTop: 4 }}>
+            {busy ? 'Gönderiliyor...' : 'Lütfen Butona Tıklayınız'}
+          </div>
+        </div>
+      </button>
+    )
+  }
 
-        <button
-          onClick={() => send('bill')}
-          disabled={!isUuid || !!loading || locked}
-          style={{
-            padding: '12px 14px',
-            borderRadius: 12,
-            border: '1px solid #ddd',
-            cursor: !isUuid || loading || locked ? 'not-allowed' : 'pointer',
-            fontSize: 16,
-            fontWeight: 600,
-          }}
-        >
-          {loading === 'bill' ? 'Gönderiliyor...' : '🧾 Hesap İste'}
-        </button>
-      </div>
-
-      {msg && (
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        padding: 18,
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #111827 100%)',
+        color: 'white',
+      }}
+    >
+      <div style={{ maxWidth: 520, margin: '0 auto' }}>
         <div
           style={{
-            marginTop: 14,
-            padding: 12,
-            borderRadius: 12,
-            background: '#111',
-            color: '#fff',
+            borderRadius: 22,
+            padding: 16,
+            marginTop: 10,
+            marginBottom: 16,
+            background: 'rgba(255,255,255,0.08)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+          }}
+        >
+          <div style={{ fontSize: 12, opacity: 0.7 }}>Masa</div>
+          <div style={{ fontSize: 32, fontWeight: 900, marginTop: 6 }}>
+            {tableNumber ?? '...'}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Card img="/waiter-v2.png?v=7" title="Garson Çağır" type="waiter" />
+          <Card img="/bill.png?v=7" title="Hesap İste" type="bill" />
+        </div>
+
+        {locked ? (
+          <div style={{ textAlign: 'center', fontSize: 12, opacity: 0.7, marginTop: 10 }}>
+            Lütfen birkaç saniye bekleyin…
+          </div>
+        ) : null}
+      </div>
+
+      {msg ? (
+        <div
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 22,
+            transform: 'translateX(-50%)',
+            background: '#111827',
+            color: 'white',
+            padding: '12px 16px',
+            borderRadius: 14,
             fontSize: 14,
+            boxShadow: '0 10px 35px rgba(0,0,0,0.4)',
+            maxWidth: '92vw',
           }}
         >
           {msg}
         </div>
-      )}
-    </main>
+      ) : null}
+    </div>
   )
 }
