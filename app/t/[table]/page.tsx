@@ -72,6 +72,8 @@ export default function TablePage() {
   return (
     <div style={{ minHeight: '100vh', padding: 18, background: '#0b0f1a', color: 'white' }}>
       <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 10 }}>CASITA PREMIUM</div>
+
         <div
           style={{
             borderRadius: 18,
@@ -81,7 +83,7 @@ export default function TablePage() {
           }}
         >
           <div style={{ fontSize: 14, opacity: 0.85 }}>Casita Nişantaşı</div>
-          <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>{title}</div>
+          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 6 }}>{title}</div>
 
           {!row ? (
             <div
@@ -155,8 +157,7 @@ export default function TablePage() {
                     borderRadius: 14,
                     background: 'rgba(34,197,94,0.18)',
                     border: '1px solid rgba(34,197,94,0.35)',
-                    color: 'white',
-                    fontWeight: 700
+                    fontWeight: 800
                   }}
                 >
                   {toast}
