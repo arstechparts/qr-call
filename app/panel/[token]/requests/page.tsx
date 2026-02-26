@@ -9,6 +9,7 @@ type Restaurant = {
   id: string
   name: string
   panel_token: string
+  logo_url?: string | null
 }
 
 type ReqRow = {
@@ -21,6 +22,9 @@ type ReqRow = {
   completed_at: string | null
 }
 
+const fmtTR = (iso: string) =>
+  new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })
+
 export default function Page() {
   const params = useParams<{ token: string }>()
   const panelToken = params?.token
@@ -32,14 +36,10 @@ export default function Page() {
     if (!panelToken) return null
     const { data, error } = await supabase
       .from('restaurants')
-      .select('id, name, panel_token')
+      .select('id, name, panel_token, logo_url')
       .eq('panel_token', panelToken)
       .single()
-
-    if (error) {
-      alert(error.message)
-      return null
-    }
+    if (error) return null
     return data as Restaurant
   }
 
@@ -88,7 +88,13 @@ export default function Page() {
   return (
     <div style={{ padding: 40 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <h1 style={{ margin: 0 }}>{restaurant.name} · İstekler</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {restaurant.logo_url ? (
+            <img src={restaurant.logo_url} alt="logo" style={{ width: 28, height: 28, borderRadius: 6 }} />
+          ) : null}
+          <h1 style={{ margin: 0 }}>{restaurant.name} · İstekler</h1>
+        </div>
+
         <div style={{ display: 'flex', gap: 16 }}>
           <Link href={`/panel/${panelToken}`}>Panel</Link>
           <Link href={`/panel/${panelToken}/tables`}>Masalar</Link>
@@ -117,7 +123,7 @@ export default function Page() {
                   <div style={{ fontSize: 12, opacity: 0.8 }}>
                     {r.request_type === 'waiter' ? 'Garson' : r.request_type === 'bill' ? 'Hesap' : r.request_type}
                     {' · '}
-                    {new Date(r.created_at).toLocaleString()}
+                    {fmtTR(r.created_at)}
                   </div>
                 </div>
 

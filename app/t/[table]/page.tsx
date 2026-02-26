@@ -12,59 +12,79 @@ type TableRow = {
   is_active: boolean
 }
 
+type RestaurantRow = {
+  id: string
+  name: string
+  // eğer sende varsa kullanırız, yoksa boş kalır
+  logo_url?: string | null
+}
+
 export default function TablePage() {
   const params = useParams<{ table: string }>()
-  const token = params?.table // table_token
+  const token = params?.table
 
-  const [row, setRow] = useState<TableRow | null>(null)
+  const [table, setTable] = useState<TableRow | null>(null)
+  const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState<null | 'waiter' | 'bill'>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   const title = useMemo(() => {
     if (loading) return 'Yükleniyor…'
-    if (!row) return 'QR geçersiz'
-    return `Masa ${row.table_number}`
-  }, [loading, row])
+    if (!table) return 'QR geçersiz'
+    return `Masa ${table.table_number}`
+  }, [loading, table])
 
   useEffect(() => {
     ;(async () => {
       if (!token) return
       setLoading(true)
 
-      const { data, error } = await supabase
+      const t = await supabase
         .from('restaurant_tables')
         .select('id, restaurant_id, table_number, table_token, is_active')
         .eq('table_token', token)
         .eq('is_active', true)
         .single()
 
-      if (error) setRow(null)
-      else setRow(data as TableRow)
+      if (t.error || !t.data) {
+        setTable(null)
+        setRestaurant(null)
+        setLoading(false)
+        return
+      }
+
+      setTable(t.data as TableRow)
+
+      const r = await supabase
+        .from('restaurants')
+        .select('id, name, logo_url')
+        .eq('id', t.data.restaurant_id)
+        .single()
+
+      if (!r.error && r.data) setRestaurant(r.data as RestaurantRow)
+      else setRestaurant(null)
 
       setLoading(false)
     })()
   }, [token])
 
   async function sendRequest(type: 'waiter' | 'bill') {
-    if (!row) return
+    if (!table) return
     setToast(null)
     setSending(type)
 
     const { error } = await supabase.from('requests').insert([
       {
-        restaurant_id: row.restaurant_id,
-        table_number: row.table_number,
+        restaurant_id: table.restaurant_id,
+        table_number: table.table_number,
         request_type: type,
         status: 'waiting'
       }
     ])
 
-    if (error) {
-      alert(error.message)
-    } else {
-      setToast(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
-    }
+    if (error) alert(error.message)
+    else setToast(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
 
     setSending(null)
   }
@@ -72,8 +92,6 @@ export default function TablePage() {
   return (
     <div style={{ minHeight: '100vh', padding: 18, background: '#0b0f1a', color: 'white' }}>
       <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 10 }}>CASITA PREMIUM</div>
-
         <div
           style={{
             borderRadius: 18,
@@ -82,10 +100,18 @@ export default function TablePage() {
             border: '1px solid rgba(255,255,255,0.10)'
           }}
         >
-          <div style={{ fontSize: 14, opacity: 0.85 }}>Casita Nişantaşı</div>
-          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 6 }}>{title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {restaurant?.logo_url ? (
+              <img src={restaurant.logo_url} alt="logo" style={{ width: 28, height: 28, borderRadius: 6 }} />
+            ) : null}
+            <div style={{ fontSize: 14, opacity: 0.85 }}>
+              {restaurant?.name ?? 'Restoran'}
+            </div>
+          </div>
 
-          {!row ? (
+          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>{title}</div>
+
+          {!table ? (
             <div
               style={{
                 marginTop: 14,
@@ -99,20 +125,6 @@ export default function TablePage() {
             </div>
           ) : (
             <>
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: 12,
-                  borderRadius: 14,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  fontSize: 13,
-                  opacity: 0.9
-                }}
-              >
-                Tek dokunuşla çağrı gönderin. Garson ekranına düşer.
-              </div>
-
               <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
                 <button
                   onClick={() => sendRequest('waiter')}
@@ -124,7 +136,7 @@ export default function TablePage() {
                     fontWeight: 800,
                     cursor: 'pointer',
                     border: '1px solid rgba(255,255,255,0.18)',
-                    background: sending === 'waiter' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.10)',
+                    background: 'rgba(255,255,255,0.10)',
                     color: 'white'
                   }}
                 >
@@ -141,7 +153,7 @@ export default function TablePage() {
                     fontWeight: 800,
                     cursor: 'pointer',
                     border: '1px solid rgba(255,255,255,0.18)',
-                    background: sending === 'bill' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.10)',
+                    background: 'rgba(255,255,255,0.10)',
                     color: 'white'
                   }}
                 >
