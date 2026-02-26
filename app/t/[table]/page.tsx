@@ -14,11 +14,12 @@ type TableRow = {
 
 export default function TablePage() {
   const params = useParams<{ table: string }>()
-  const token = params?.table
+  const token = params?.table // table_token
 
   const [row, setRow] = useState<TableRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState<null | 'waiter' | 'bill'>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const title = useMemo(() => {
     if (loading) return 'Yükleniyor…'
@@ -29,7 +30,6 @@ export default function TablePage() {
   useEffect(() => {
     ;(async () => {
       if (!token) return
-
       setLoading(true)
 
       const { data, error } = await supabase
@@ -48,6 +48,7 @@ export default function TablePage() {
 
   async function sendRequest(type: 'waiter' | 'bill') {
     if (!row) return
+    setToast(null)
     setSending(type)
 
     const { error } = await supabase.from('requests').insert([
@@ -62,45 +63,109 @@ export default function TablePage() {
     if (error) {
       alert(error.message)
     } else {
-      alert('Gönderildi ✅')
+      setToast(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
     }
 
     setSending(null)
   }
 
   return (
-    <div style={{ padding: 28, maxWidth: 520, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 10 }}>{title}</h1>
+    <div style={{ minHeight: '100vh', padding: 18, background: '#0b0f1a', color: 'white' }}>
+      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+        <div
+          style={{
+            borderRadius: 18,
+            padding: 18,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.10)'
+          }}
+        >
+          <div style={{ fontSize: 14, opacity: 0.85 }}>Casita Nişantaşı</div>
+          <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>{title}</div>
 
-      {!row ? (
-        <div style={{ padding: 14, border: '1px solid #eee', borderRadius: 12 }}>
-          Bu QR kod geçersiz ya da masa kapalı.
+          {!row ? (
+            <div
+              style={{
+                marginTop: 14,
+                padding: 14,
+                borderRadius: 14,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.10)'
+              }}
+            >
+              Bu QR kod geçersiz ya da masa kapalı.
+            </div>
+          ) : (
+            <>
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 14,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  fontSize: 13,
+                  opacity: 0.9
+                }}
+              >
+                Tek dokunuşla çağrı gönderin. Garson ekranına düşer.
+              </div>
+
+              <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+                <button
+                  onClick={() => sendRequest('waiter')}
+                  disabled={sending !== null}
+                  style={{
+                    padding: 16,
+                    borderRadius: 16,
+                    fontSize: 16,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    background: sending === 'waiter' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.10)',
+                    color: 'white'
+                  }}
+                >
+                  {sending === 'waiter' ? 'Gönderiliyor…' : 'Garson Çağır'}
+                </button>
+
+                <button
+                  onClick={() => sendRequest('bill')}
+                  disabled={sending !== null}
+                  style={{
+                    padding: 16,
+                    borderRadius: 16,
+                    fontSize: 16,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    background: sending === 'bill' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.10)',
+                    color: 'white'
+                  }}
+                >
+                  {sending === 'bill' ? 'Gönderiliyor…' : 'Hesap İste'}
+                </button>
+              </div>
+
+              {toast ? (
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: 12,
+                    borderRadius: 14,
+                    background: 'rgba(34,197,94,0.18)',
+                    border: '1px solid rgba(34,197,94,0.35)',
+                    color: 'white',
+                    fontWeight: 700
+                  }}
+                >
+                  {toast}
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
-      ) : (
-        <>
-          <div style={{ padding: 14, border: '1px solid #eee', borderRadius: 12, marginBottom: 16 }}>
-            Masa: <b>{row.table_number}</b>
-          </div>
-
-          <div style={{ display: 'grid', gap: 12 }}>
-            <button
-              onClick={() => sendRequest('waiter')}
-              disabled={sending !== null}
-              style={{ padding: 16, borderRadius: 14, cursor: 'pointer' }}
-            >
-              {sending === 'waiter' ? 'Gönderiliyor…' : 'Garson Çağır'}
-            </button>
-
-            <button
-              onClick={() => sendRequest('bill')}
-              disabled={sending !== null}
-              style={{ padding: 16, borderRadius: 14, cursor: 'pointer' }}
-            >
-              {sending === 'bill' ? 'Gönderiliyor…' : 'Hesap İste'}
-            </button>
-          </div>
-        </>
-      )}
+      </div>
     </div>
   )
 }
