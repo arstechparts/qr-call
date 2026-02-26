@@ -1,211 +1,106 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabaseClient'
+
+type TableRow = {
+  id: string
+  restaurant_id: string
+  table_number: number
+  table_token: string
+  is_active: boolean
+}
 
 export default function TablePage() {
   const params = useParams<{ table: string }>()
-  const token = params.table // URL: /t/<TABLE_TOKEN_UUID>
+  const token = params?.table
 
-  const [loading, setLoading] = useState<'waiter' | 'bill' | null>(null)
-  const [msg, setMsg] = useState('')
-  const [tableNumber, setTableNumber] = useState<number | null>(null)
-  const [locked, setLocked] = useState(false)
+  const [row, setRow] = useState<TableRow | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState<null | 'waiter' | 'bill'>(null)
 
-  const lockTimer = useRef<any>(null)
-  const toastTimer = useRef<any>(null)
+  const title = useMemo(() => {
+    if (loading) return 'Yükleniyor…'
+    if (!row) return 'QR geçersiz'
+    return `Masa ${row.table_number}`
+  }, [loading, row])
 
   useEffect(() => {
-    const loadTable = async () => {
-      // ✅ URL’de UUID table_token var → DB’de restaurant_tables.table_token ile eşleştir
+    ;(async () => {
+      if (!token) return
+
+      setLoading(true)
+
       const { data, error } = await supabase
         .from('restaurant_tables')
-        .select('table_number')
+        .select('id, restaurant_id, table_number, table_token, is_active')
         .eq('table_token', token)
+        .eq('is_active', true)
         .single()
 
-      if (error) {
-        console.error('loadTable error:', error)
-        return
-      }
-      if (data) setTableNumber(data.table_number)
-    }
+      if (error) setRow(null)
+      else setRow(data as TableRow)
 
-    if (token) loadTable()
-
-    return () => {
-      if (lockTimer.current) clearTimeout(lockTimer.current)
-      if (toastTimer.current) clearTimeout(toastTimer.current)
-    }
+      setLoading(false)
+    })()
   }, [token])
 
-  const lockForSeconds = (sec: number) => {
-    setLocked(true)
-    if (lockTimer.current) clearTimeout(lockTimer.current)
-    lockTimer.current = setTimeout(() => setLocked(false), sec * 1000)
-  }
+  async function sendRequest(type: 'waiter' | 'bill') {
+    if (!row) return
+    setSending(type)
 
-  const showToast = (text: string, ms = 1700) => {
-    setMsg(text)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setMsg(''), ms)
-  }
-
-  const send = async (type: 'waiter' | 'bill') => {
-    if (!token) {
-      showToast('Geçersiz masa linki.')
-      return
-    }
-    if (locked || loading) return
-
-    lockForSeconds(3)
-    setLoading(type)
-
-    const { error } = await supabase.rpc('create_request', {
-      // ✅ Function param adı: p_table_token (uuid)
-      p_table_token: token,
-      p_request_type: type,
-    })
-
-    setLoading(null)
+    const { error } = await supabase.from('requests').insert([
+      {
+        restaurant_id: row.restaurant_id,
+        table_number: row.table_number,
+        request_type: type,
+        status: 'waiting'
+      }
+    ])
 
     if (error) {
-      console.error('create_request error:', error)
-      showToast('Bir sorun oldu. Tekrar deneyin.')
-      return
+      alert(error.message)
+    } else {
+      alert('Gönderildi ✅')
     }
 
-    showToast(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
-  }
-
-  const Card = ({
-    img,
-    title,
-    type,
-  }: {
-    img: string
-    title: string
-    type: 'waiter' | 'bill'
-  }) => {
-    const busy = loading === type
-    const disabled = locked || loading !== null
-
-    return (
-      <button
-        onClick={() => send(type)}
-        disabled={disabled}
-        style={{
-          width: '100%',
-          background: 'rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: 24,
-          padding: 18,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          transition: 'transform 120ms ease',
-        }}
-        onMouseDown={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)'
-        }}
-        onMouseUp={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
-        }}
-        onMouseLeave={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
-        }}
-      >
-        <div
-          style={{
-            width: '100%',
-            height: 'clamp(150px, 22vh, 210px)',
-            borderRadius: 18,
-            overflow: 'hidden',
-          }}
-        >
-          <img
-            src={img}
-            alt={title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 19, fontWeight: 900, color: 'white' }}>{title}</div>
-          <div style={{ fontSize: 12, opacity: 0.8, color: 'white', marginTop: 4 }}>
-            {busy ? 'Gönderiliyor...' : 'Lütfen Butona Tıklayınız'}
-          </div>
-        </div>
-      </button>
-    )
+    setSending(null)
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        padding: 18,
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #111827 100%)',
-        color: 'white',
-      }}
-    >
-      <div style={{ maxWidth: 520, margin: '0 auto' }}>
-        <div
-          style={{
-            borderRadius: 22,
-            padding: 16,
-            marginTop: 10,
-            marginBottom: 16,
-            background: 'rgba(255,255,255,0.08)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-          }}
-        >
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Masa</div>
-          <div style={{ fontSize: 32, fontWeight: 900, marginTop: 6 }}>
-            {tableNumber ?? '...'}
+    <div style={{ padding: 28, maxWidth: 520, margin: '0 auto' }}>
+      <h1 style={{ fontSize: 28, marginBottom: 10 }}>{title}</h1>
+
+      {!row ? (
+        <div style={{ padding: 14, border: '1px solid #eee', borderRadius: 12 }}>
+          Bu QR kod geçersiz ya da masa kapalı.
+        </div>
+      ) : (
+        <>
+          <div style={{ padding: 14, border: '1px solid #eee', borderRadius: 12, marginBottom: 16 }}>
+            Masa: <b>{row.table_number}</b>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card img="/waiter-v2.png?v=7" title="Garson Çağır" type="waiter" />
-          <Card img="/bill.png?v=7" title="Hesap İste" type="bill" />
-        </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <button
+              onClick={() => sendRequest('waiter')}
+              disabled={sending !== null}
+              style={{ padding: 16, borderRadius: 14, cursor: 'pointer' }}
+            >
+              {sending === 'waiter' ? 'Gönderiliyor…' : 'Garson Çağır'}
+            </button>
 
-        {locked ? (
-          <div style={{ textAlign: 'center', fontSize: 12, opacity: 0.7, marginTop: 10 }}>
-            Lütfen birkaç saniye bekleyin…
+            <button
+              onClick={() => sendRequest('bill')}
+              disabled={sending !== null}
+              style={{ padding: 16, borderRadius: 14, cursor: 'pointer' }}
+            >
+              {sending === 'bill' ? 'Gönderiliyor…' : 'Hesap İste'}
+            </button>
           </div>
-        ) : null}
-      </div>
-
-      {msg ? (
-        <div
-          style={{
-            position: 'fixed',
-            left: '50%',
-            bottom: 22,
-            transform: 'translateX(-50%)',
-            background: '#111827',
-            color: 'white',
-            padding: '12px 16px',
-            borderRadius: 14,
-            fontSize: 14,
-            boxShadow: '0 10px 35px rgba(0,0,0,0.4)',
-            maxWidth: '92vw',
-          }}
-        >
-          {msg}
-        </div>
-      ) : null}
+        </>
+      )}
     </div>
   )
 }
