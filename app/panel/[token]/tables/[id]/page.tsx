@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import QRCode from 'react-qr-code'
 import QR from 'qrcode'
@@ -17,8 +16,7 @@ type Row = {
 }
 
 export default function Page() {
-  const params = useParams<{ token: string; id: string }>()
-  const panelToken = params?.token
+  const params = useParams<{ id: string }>()
   const id = params?.id
 
   const [row, setRow] = useState<Row | null>(null)
@@ -30,8 +28,8 @@ export default function Page() {
 
   const qrUrl = useMemo(() => {
     if (!row) return ''
-    const t = row.table_token ?? row.token
-    return `${baseUrl}/t/${t}`
+    const token = row.table_token ?? row.token
+    return `${baseUrl}/t/${token}`
   }, [row, baseUrl])
 
   useEffect(() => {
@@ -61,13 +59,10 @@ export default function Page() {
 
   return (
     <div style={{ padding: 40, maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ margin: 0 }}>Masa {row.table_number} QR</h1>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <Link href={`/panel/${panelToken}/tables`} style={{ textDecoration: 'none' }}>
-            ← Masalar
-          </Link>
+        <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => window.print()} style={{ padding: '10px 12px', cursor: 'pointer' }}>
             Yazdır
           </button>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -14,14 +14,21 @@ type TableRow = {
 
 export default function TablePage() {
   const params = useParams<{ table: string }>()
-  const token = params?.table
+  const token = params?.table // burada "table" aslında table_token
 
   const [row, setRow] = useState<TableRow | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const title = useMemo(() => {
+    if (loading) return 'Yükleniyor…'
+    if (!row) return 'QR geçersiz'
+    return `Masa ${row.table_number}`
+  }, [loading, row])
+
   useEffect(() => {
     ;(async () => {
       if (!token) return
+
       setLoading(true)
 
       const { data, error } = await supabase
@@ -31,41 +38,47 @@ export default function TablePage() {
         .eq('is_active', true)
         .single()
 
-      if (error) setRow(null)
-      else setRow(data as TableRow)
+      if (error) {
+        setRow(null)
+      } else {
+        setRow(data as TableRow)
+      }
 
       setLoading(false)
     })()
   }, [token])
 
   return (
-    <div style={{ minHeight: '100vh', padding: 18, background: '#0b0f1a', color: 'white' }}>
-      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 10 }}>
-          CASITA PREMIUM v1
-        </div>
+    <div style={{ padding: 28, maxWidth: 520, margin: '0 auto' }}>
+      <h1 style={{ fontSize: 28, marginBottom: 10 }}>{title}</h1>
 
-        <div
-          style={{
-            borderRadius: 18,
-            padding: 18,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)'
-          }}
-        >
-          <div style={{ fontSize: 14, opacity: 0.85 }}>Casita Nişantaşı</div>
-
-          {loading ? (
-            <div style={{ marginTop: 10 }}>Yükleniyor…</div>
-          ) : !row ? (
-            <div style={{ marginTop: 10 }}>QR geçersiz</div>
-          ) : (
-            <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800 }}>
-              Masa {row.table_number}
-            </div>
-          )}
+      {!row ? (
+        <div style={{ padding: 14, border: '1px solid #eee', borderRadius: 12 }}>
+          Bu QR kod geçersiz ya da masa kapalı.
         </div>
-      </div>
+      ) : (
+        <>
+          <div style={{ padding: 14, border: '1px solid #eee', borderRadius: 12, marginBottom: 16 }}>
+            Restoran: <span style={{ fontFamily: 'monospace' }}>{row.restaurant_id}</span>
+          </div>
+
+          <div style={{ display: 'grid', gap: 12 }}>
+            <button
+              onClick={() => alert('Garson çağır (bir sonraki adımda requests insert)')}
+              style={{ padding: 16, borderRadius: 14, cursor: 'pointer' }}
+            >
+              Garson Çağır
+            </button>
+
+            <button
+              onClick={() => alert('Hesap iste (bir sonraki adımda requests insert)')}
+              style={{ padding: 16, borderRadius: 14, cursor: 'pointer' }}
+            >
+              Hesap İste
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
