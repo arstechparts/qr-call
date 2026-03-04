@@ -4,147 +4,86 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-type TableRow = {
-  table_number: number
-  restaurant_id: string
-}
-
 export default function Page() {
+
   const params = useParams()
   const token = params?.table as string
 
-  const [table, setTable] = useState<TableRow | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [table,setTable] = useState<any>(null)
+  const [loading,setLoading] = useState(true)
 
-  useEffect(() => {
-    ;(async () => {
-      setLoading(true)
+  useEffect(()=>{
 
-      const { data, error } = await supabase
+    async function load(){
+
+      let {data} = await supabase
         .from('restaurant_tables')
-        .select('table_number, restaurant_id')
-        .eq('token', token)          // ✅ UUID değil TEXT token
-        .eq('is_active', true)
+        .select('table_number,restaurant_id')
+        .eq('token',token)
         .single()
 
-      if (!error && data) setTable(data as TableRow)
-      else setTable(null)
+      if(!data){
+
+        let res = await supabase
+          .from('restaurant_tables')
+          .select('table_number,restaurant_id')
+          .eq('table_token',token)
+          .single()
+
+        data = res.data
+      }
+
+      if(data) setTable(data)
 
       setLoading(false)
-    })()
-  }, [token])
+    }
 
-  async function send(type: 'waiter' | 'bill') {
-    if (!table) return
+    load()
 
-    const { error } = await supabase.from('requests').insert({
-      restaurant_id: table.restaurant_id,
-      table_number: table.table_number,
-      request_type: type,
-      status: 'waiting'
+  },[token])
+
+  async function send(type:string){
+
+    if(!table) return
+
+    await supabase.from('requests').insert({
+      restaurant_id:table.restaurant_id,
+      table_number:table.table_number,
+      request_type:type
     })
 
-    if (error) alert(error.message)
-    else alert(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
+    alert('İstek gönderildi')
   }
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>Yükleniyor…</div>
-          </div>
-        </div>
+  if(loading) return <div style={{padding:40}}>Yükleniyor...</div>
+
+  if(!table) return <div style={{padding:40}}>QR geçersiz</div>
+
+  return(
+
+    <div style={{padding:40,fontFamily:'sans-serif'}}>
+
+      <h1>Masa {table.table_number}</h1>
+
+      <div style={{display:'grid',gap:20,marginTop:40}}>
+
+        <button
+          onClick={()=>send('waiter')}
+          style={{padding:20,fontSize:18}}
+        >
+          Garson Çağır
+        </button>
+
+        <button
+          onClick={()=>send('bill')}
+          style={{padding:20,fontSize:18}}
+        >
+          Hesap İste
+        </button>
+
       </div>
-    )
-  }
 
-  if (!table) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>QR geçersiz</div>
-            <div style={{ opacity: 0.8, marginTop: 6 }}>Bu QR kapalı ya da bulunamadı.</div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-        <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-          <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-
-          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>
-            Masa {table.table_number}
-          </div>
-
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <button
-              onClick={() => send('waiter')}
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                fontSize: 16,
-                fontWeight: 800,
-                cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.18)',
-                background: 'rgba(255,255,255,0.10)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12
-              }}
-            >
-              <img src="/waiter-v2.png" alt="Garson" style={{ width: 28, height: 28 }} />
-              Garson Çağır
-            </button>
-
-            <button
-              onClick={() => send('bill')}
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                fontSize: 16,
-                fontWeight: 800,
-                cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.18)',
-                background: 'rgba(255,255,255,0.10)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12
-              }}
-            >
-              <img src="/bill.png" alt="Hesap" style={{ width: 28, height: 28 }} />
-              Hesap İste
-            </button>
-
-            <a
-              href={`/t/${token}/menu`}
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                fontSize: 16,
-                fontWeight: 800,
-                border: '1px solid rgba(255,255,255,0.18)',
-                background: 'rgba(255,255,255,0.10)',
-                color: 'white',
-                textDecoration: 'none',
-                textAlign: 'center'
-              }}
-            >
-              Menüyü Gör
-            </a>
-          </div>
-        </div>
-      </div>
     </div>
+
   )
 }
