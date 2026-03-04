@@ -7,219 +7,85 @@ import { supabase } from '@/lib/supabaseClient'
 type TableRow = {
   table_number: number
   restaurant_id: string
-}
-
-function Card({
-  title,
-  subtitle,
-  img,
-  onClick,
-  href
-}: {
-  title?: string
-  subtitle?: string
-  img?: string
-  onClick?: () => void
-  href?: string
-}) {
-
-  const content = (
-    <div
-      style={{
-        borderRadius: 18,
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.10)',
-        overflow: 'hidden'
-      }}
-    >
-
-      <div
-        style={{
-          width: '100%',
-          aspectRatio: '21 / 9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        {img && (
-          <img
-            src={img}
-            alt=""
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain'
-            }}
-          />
-        )}
-      </div>
-
-      {title && (
-        <div style={{ padding: '10px 0 14px 0', textAlign: 'center' }}>
-
-          <div
-            style={{
-              fontSize: 20,
-              fontWeight: 900
-            }}
-          >
-            {title}
-          </div>
-
-          {subtitle && (
-            <div
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4
-              }}
-            >
-              {subtitle}
-            </div>
-          )}
-
-        </div>
-      )}
-
-    </div>
-  )
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        style={{
-          display: 'block',
-          textDecoration: 'none',
-          color: 'white'
-        }}
-      >
-        {content}
-      </a>
-    )
-  }
-
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: 'none',
-        background: 'none',
-        padding: 0,
-        width: '100%',
-        cursor: 'pointer'
-      }}
-    >
-      {content}
-    </button>
-  )
+  table_token: string
 }
 
 export default function Page() {
-
   const params = useParams()
-  const token = (params?.table as string) || ''
+  const incoming = String(params?.table ?? '')
 
-  const [table, setTable] = useState<TableRow | null>(null)
+  const [row, setRow] = useState<TableRow | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-
     ;(async () => {
+      setLoading(true)
 
-      const { data } = await supabase
+      // table_token ile bul (biz QR'ı bununla basıyoruz)
+      const { data, error } = await supabase
         .from('restaurant_tables')
-        .select('table_number, restaurant_id')
-        .eq('table_token', token)
+        .select('table_number, restaurant_id, table_token')
+        .eq('table_token', incoming)
         .eq('is_active', true)
         .maybeSingle()
 
-      if (data) {
-        setTable(data as TableRow)
+      if (error) {
+        setRow(null)
+        setLoading(false)
+        return
       }
 
+      setRow((data as TableRow) ?? null)
+      setLoading(false)
     })()
-
-  }, [token])
+  }, [incoming])
 
   async function send(type: 'waiter' | 'bill') {
+    if (!row) return
 
-    if (!table) return
-
-    await supabase.from('requests').insert({
-      restaurant_id: table.restaurant_id,
-      table_number: table.table_number,
+    const { error } = await supabase.from('requests').insert({
+      restaurant_id: row.restaurant_id,
+      table_number: row.table_number,
       request_type: type,
-      status: 'waiting'
+      status: 'waiting',
     })
 
-    alert('İstek gönderildi ✅')
+    if (error) alert(error.message)
+    else alert('İstek gönderildi ✅')
   }
 
-  if (!table) {
+  if (loading) return <div style={{ padding: 18, color: 'white', background: '#070A12', minHeight: '100vh' }}>Yükleniyor...</div>
+
+  if (!row) {
     return (
-      <div style={{ color: 'white', padding: 20 }}>
-        QR geçersiz
+      <div style={{ padding: 18, color: 'white', background: '#070A12', minHeight: '100vh' }}>
+        QR bulunamadı / geçersiz
       </div>
     )
   }
 
   return (
-
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#070A12',
-        padding: 14,
-        color: 'white'
-      }}
-    >
-
+    <div style={{ minHeight: '100vh', background: '#070A12', padding: 14, color: 'white' }}>
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
-
-        <div
-          style={{
-            borderRadius: 18,
-            padding: '10px 14px',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)'
-          }}
-        >
-          <div style={{ fontSize: 13, opacity: 0.8 }}>
-            Premium
-          </div>
-
-          <div style={{ fontSize: 30, fontWeight: 900 }}>
-            Masa {table.table_number}
-          </div>
+        <div style={{ borderRadius: 18, padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+          <div style={{ fontSize: 13, opacity: 0.8 }}>CASITA PREMIUM v1</div>
+          <div style={{ fontSize: 30, fontWeight: 900 }}>Masa {row.table_number}</div>
         </div>
 
         <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+          <button onClick={() => send('waiter')} style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontWeight: 900 }}>
+            Garson Çağır
+          </button>
 
-          <Card
-            title="Garson Çağır"
-            subtitle="Lütfen butona tıklayınız"
-            img="/waiter-v2.png"
-            onClick={() => send('waiter')}
-          />
+          <button onClick={() => send('bill')} style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontWeight: 900 }}>
+            Hesap İste
+          </button>
 
-          <Card
-            title="Hesap İste"
-            subtitle="Lütfen butona tıklayınız"
-            img="/bill.png"
-            onClick={() => send('bill')}
-          />
-
-          <Card
-            title="Menü"
-            img="/menu.png"
-            href={`/t/${token}/menu`}
-          />
-
+          <a href={`/t/${incoming}/menu`} style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontWeight: 900, textDecoration: 'none', textAlign: 'center' }}>
+            Menü
+          </a>
         </div>
-
       </div>
-
     </div>
   )
 }
