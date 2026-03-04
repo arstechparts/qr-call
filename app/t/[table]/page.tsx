@@ -14,41 +14,16 @@ function Card({
   subtitle,
   img,
   onClick,
-  href
+  href,
+  hideText = false
 }: {
   title: string
   subtitle?: string
   img?: string
   onClick?: () => void
   href?: string
+  hideText?: boolean
 }) {
-  const image = (
-    <div
-      style={{
-        width: '100%',
-        aspectRatio: '21 / 9',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
-    >
-      {img ? (
-        <img
-          src={img}
-          alt={title}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            objectPosition: 'center'
-          }}
-        />
-      ) : (
-        <div style={{ fontSize: 34, fontWeight: 900 }}>Menü</div>
-      )}
-    </div>
-  )
-
   const body = (
     <div
       style={{
@@ -58,18 +33,41 @@ function Card({
         overflow: 'hidden'
       }}
     >
-      {image}
+      <div
+        style={{
+          width: '100%',
+          aspectRatio: '21 / 9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        {img ? (
+          <img
+            src={img}
+            alt={title}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              objectPosition: 'center'
+            }}
+          />
+        ) : (
+          <div style={{ fontSize: 34, fontWeight: 900 }}>Menü</div>
+        )}
+      </div>
 
-      {img ? (
+      {!hideText && (
         <div style={{ padding: '10px 0 14px 0', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
-          {subtitle ? (
+          {subtitle && (
             <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               {subtitle}
             </div>
-          ) : null}
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   )
 
@@ -153,4 +151,9 @@ export default function Page() {
         color: 'white'
       }}
     >
-      <div style={{ maxWidth: 520, margin:
+      <div style={{ maxWidth: 520, margin: '0 auto' }}>
+        <div
+          style={{
+            borderRadius: 18,
+            padding: '10px 14px',
+            background: 'rgba(255,255,255,0.
