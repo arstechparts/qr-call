@@ -17,7 +17,17 @@ function label(type: string) {
 }
 
 function trTime(iso: string) {
-  return new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })
+  // 04.03.2026 22:19:05 formatı (TR + Istanbul)
+  return new Intl.DateTimeFormat('tr-TR', {
+    timeZone: 'Europe/Istanbul',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(new Date(iso))
 }
 
 export default function Panel() {
@@ -35,9 +45,32 @@ export default function Panel() {
     setRows((data ?? []) as ReqRow[])
   }
 
-  function beep() {
+  async function playAlert() {
     if (!soundOn) return
-    audioRef.current?.play().catch(() => {})
+    const a = audioRef.current
+    if (!a) return
+    try {
+      a.currentTime = 0
+      a.volume = 1
+      await a.play()
+    } catch {
+      // bazı tarayıcılarda ilk sefer unlock gerekir
+    }
+  }
+
+  async function unlockSound() {
+    const a = audioRef.current
+    if (!a) return
+    try {
+      a.currentTime = 0
+      a.volume = 0
+      await a.play()     // unlock
+      a.pause()
+      a.volume = 1
+      setSoundOn(true)
+    } catch {
+      setSoundOn(true) // yine de açık say
+    }
   }
 
   useEffect(() => {
@@ -47,17 +80,22 @@ export default function Panel() {
       .channel('requests-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, async () => {
         await load()
-        beep()
+        await playAlert()
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(ch)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soundOn])
 
   async function complete(id: string) {
-    await supabase.from('requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', id)
+    await supabase
+      .from('requests')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', id)
+
     load()
   }
 
@@ -69,10 +107,7 @@ export default function Panel() {
         <h1 style={{ margin: 0 }}>Garson Paneli</h1>
 
         <button
-          onClick={() => {
-            setSoundOn(true)
-            setTimeout(() => beep(), 50)
-          }}
+          onClick={unlockSound}
           style={{ padding: '10px 14px', cursor: 'pointer' }}
         >
           {soundOn ? 'Ses Açık ✅' : 'Sesi Aç'}
