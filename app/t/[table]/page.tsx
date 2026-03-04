@@ -14,18 +14,16 @@ function Card({
   subtitle,
   img,
   onClick,
-  href,
-  hideText = false
+  href
 }: {
-  title: string
+  title?: string
   subtitle?: string
   img?: string
   onClick?: () => void
   href?: string
-  hideText?: boolean
 }) {
 
-  const body = (
+  const content = (
     <div
       style={{
         borderRadius: 18,
@@ -34,6 +32,7 @@ function Card({
         overflow: 'hidden'
       }}
     >
+
       <div
         style={{
           width: '100%',
@@ -46,7 +45,7 @@ function Card({
         {img && (
           <img
             src={img}
-            alt={title}
+            alt=""
             style={{
               width: '100%',
               height: '100%',
@@ -56,16 +55,33 @@ function Card({
         )}
       </div>
 
-      {!hideText && (
+      {title && (
         <div style={{ padding: '10px 0 14px 0', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
+
+          <div
+            style={{
+              fontSize: 20,
+              fontWeight: 900
+            }}
+          >
+            {title}
+          </div>
+
           {subtitle && (
-            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+            <div
+              style={{
+                fontSize: 12,
+                opacity: 0.8,
+                marginTop: 4
+              }}
+            >
               {subtitle}
             </div>
           )}
+
         </div>
       )}
+
     </div>
   )
 
@@ -79,7 +95,7 @@ function Card({
           color: 'white'
         }}
       >
-        {body}
+        {content}
       </a>
     )
   }
@@ -95,7 +111,7 @@ function Card({
         cursor: 'pointer'
       }}
     >
-      {body}
+      {content}
     </button>
   )
 }
@@ -118,7 +134,9 @@ export default function Page() {
         .eq('is_active', true)
         .maybeSingle()
 
-      if (data) setTable(data as TableRow)
+      if (data) {
+        setTable(data as TableRow)
+      }
 
     })()
 
@@ -167,7 +185,10 @@ export default function Page() {
             border: '1px solid rgba(255,255,255,0.10)'
           }}
         >
-          <div style={{ fontSize: 13, opacity: 0.8 }}>Premium</div>
+          <div style={{ fontSize: 13, opacity: 0.8 }}>
+            Premium
+          </div>
+
           <div style={{ fontSize: 30, fontWeight: 900 }}>
             Masa {table.table_number}
           </div>
@@ -189,11 +210,10 @@ export default function Page() {
             onClick={() => send('bill')}
           />
 
-          {/* Menü kartı */}
           <Card
+            title="Menü"
             img="/menu.png"
             href={`/t/${token}/menu`}
-            hideText={true}
           />
 
         </div>
