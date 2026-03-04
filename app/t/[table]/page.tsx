@@ -11,50 +11,78 @@ type TableRow = {
 
 export default function Page() {
   const params = useParams()
-  const tableToken = params?.table as string
+  const token = params?.table as string
 
   const [table, setTable] = useState<TableRow | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     ;(async () => {
-      const { data } = await supabase
+      setLoading(true)
+
+      const { data, error } = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
-        .eq('table_token', tableToken)
+        .eq('token', token)          // ✅ UUID değil TEXT token
+        .eq('is_active', true)
         .single()
 
-      if (data) setTable(data as TableRow)
+      if (!error && data) setTable(data as TableRow)
+      else setTable(null)
+
+      setLoading(false)
     })()
-  }, [tableToken])
+  }, [token])
 
   async function send(type: 'waiter' | 'bill') {
     if (!table) return
 
-    await supabase.from('requests').insert({
+    const { error } = await supabase.from('requests').insert({
       restaurant_id: table.restaurant_id,
       table_number: table.table_number,
       request_type: type,
       status: 'waiting'
     })
 
-    alert(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
+    if (error) alert(error.message)
+    else alert(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>Yükleniyor…</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!table) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>QR geçersiz</div>
+            <div style={{ opacity: 0.8, marginTop: 6 }}>Bu QR kapalı ya da bulunamadı.</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
       <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-        <div
-          style={{
-            borderRadius: 18,
-            padding: 18,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)'
-          }}
-        >
+        <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
           <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
 
           <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>
-            {table ? `Masa ${table.table_number}` : 'Yükleniyor…'}
+            Masa {table.table_number}
           </div>
 
           <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
@@ -99,7 +127,7 @@ export default function Page() {
             </button>
 
             <a
-              href={`/t/${tableToken}/menu`}
+              href={`/t/${token}/menu`}
               style={{
                 padding: 16,
                 borderRadius: 16,
