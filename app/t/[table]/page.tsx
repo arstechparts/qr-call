@@ -15,7 +15,9 @@ function CardButton({
   img,
   onClick,
   href,
-  cover = true
+  cover = true,
+  showImageFrame = true,
+  hideTitleBelow = false
 }: {
   title: string
   subtitle?: string
@@ -23,6 +25,8 @@ function CardButton({
   onClick?: () => void
   href?: string
   cover?: boolean
+  showImageFrame?: boolean
+  hideTitleBelow?: boolean
 }) {
   const common: React.CSSProperties = {
     borderRadius: 18,
@@ -31,20 +35,25 @@ function CardButton({
     overflow: 'hidden'
   }
 
+  const imageWrapStyle: React.CSSProperties = showImageFrame
+    ? {
+        width: '100%',
+        aspectRatio: '21 / 9',
+        borderRadius: 14,
+        overflow: 'hidden',
+        background: 'rgba(255,255,255,0.04)'
+      }
+    : {
+        width: '100%',
+        aspectRatio: '21 / 9',
+        borderRadius: 0,
+        overflow: 'hidden',
+        background: 'transparent'
+      }
+
   const inner = (
     <div style={{ padding: 12 }}>
-      <div
-        style={{
-          width: '100%',
-          aspectRatio: '21 / 9',
-          borderRadius: 14,
-          overflow: 'hidden',
-          background: 'rgba(255,255,255,0.04)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
+      <div style={imageWrapStyle}>
         {img ? (
           <img
             src={img}
@@ -52,21 +61,37 @@ function CardButton({
             style={{
               width: '100%',
               height: '100%',
-              objectFit: cover ? 'cover' : 'contain', // ✅ garson kafa kesilmesin
-              objectPosition: 'center'
+              objectFit: cover ? 'cover' : 'contain',
+              objectPosition: 'center',
+              display: 'block'
             }}
           />
         ) : (
-          <div style={{ fontSize: 30, fontWeight: 900 }}>Menü</div>
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 30,
+              fontWeight: 900
+            }}
+          >
+            Menü
+          </div>
         )}
       </div>
 
-      <div style={{ marginTop: 10, textAlign: 'center' }}>
-        <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
-        {subtitle ? (
-          <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>{subtitle}</div>
-        ) : null}
-      </div>
+      {/* ✅ Menü kartında alttaki tekrar "Menü" yazısı kalktı */}
+      {!hideTitleBelow ? (
+        <div style={{ marginTop: 10, textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
+          {subtitle ? (
+            <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>{subtitle}</div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 
@@ -178,18 +203,19 @@ export default function Page() {
   return (
     <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 14 }}>
       <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 10 }}>
-        {/* ✅ Masa kutusu küçültüldü */}
         <div style={{ borderRadius: 18, padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
           <div style={{ fontSize: 13, opacity: 0.85 }}>Premium</div>
           <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>Masa {table.table_number}</div>
         </div>
 
         <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+          {/* ✅ Garson kartında iç görsel çerçevesi kaldırıldı */}
           <CardButton
             title="Garson Çağır"
             subtitle="Lütfen butona tıklayınız"
             img="/waiter-v2.png"
-            cover={false} // ✅ kafa kesilmesin
+            cover={false}
+            showImageFrame={false}
             onClick={() => send('waiter')}
           />
 
@@ -201,8 +227,8 @@ export default function Page() {
             onClick={() => send('bill')}
           />
 
-          {/* ✅ Menü kartında alttaki ekstra yazılar kaldırıldı */}
-          <CardButton title="Menü" href={`/t/${incoming}/menu`} />
+          {/* ✅ Menü kartında altta tekrar yazı yok */}
+          <CardButton title="Menü" href={`/t/${incoming}/menu`} hideTitleBelow={true} />
         </div>
       </div>
     </div>
