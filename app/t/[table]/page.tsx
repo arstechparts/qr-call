@@ -4,72 +4,119 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+type TableRow = {
+  table_number: number
+  restaurant_id: string
+}
+
 export default function Page() {
   const params = useParams()
-  const token = params?.table as string
+  const tableToken = params?.table as string
 
-  const [tableNumber, setTableNumber] = useState<number | null>(null)
-  const [restaurantId, setRestaurantId] = useState<string | null>(null)
+  const [table, setTable] = useState<TableRow | null>(null)
 
   useEffect(() => {
-    async function load() {
+    ;(async () => {
       const { data } = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
-        .eq('table_token', token)
+        .eq('table_token', tableToken)
         .single()
 
-      if (data) {
-        setTableNumber(data.table_number)
-        setRestaurantId(data.restaurant_id)
-      }
-    }
+      if (data) setTable(data as TableRow)
+    })()
+  }, [tableToken])
 
-    load()
-  }, [token])
-
-  async function send(type: string) {
-    if (!restaurantId || !tableNumber) return
+  async function send(type: 'waiter' | 'bill') {
+    if (!table) return
 
     await supabase.from('requests').insert({
-      restaurant_id: restaurantId,
-      table_number: tableNumber,
-      request_type: type
+      restaurant_id: table.restaurant_id,
+      table_number: table.table_number,
+      request_type: type,
+      status: 'waiting'
     })
 
-    alert('İstek gönderildi')
+    alert(type === 'waiter' ? 'Garson çağrıldı ✅' : 'Hesap istendi ✅')
   }
 
   return (
-    <div style={{padding:40,fontFamily:'sans-serif'}}>
-
-      <h1>Masa {tableNumber}</h1>
-
-      <div style={{display:'grid',gap:20,marginTop:40}}>
-
-        <button
-          onClick={()=>send('waiter')}
-          style={{padding:20,fontSize:18}}
+    <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
+      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+        <div
+          style={{
+            borderRadius: 18,
+            padding: 18,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.10)'
+          }}
         >
-          Garson Çağır
-        </button>
+          <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
 
-        <button
-          onClick={()=>send('bill')}
-          style={{padding:20,fontSize:18}}
-        >
-          Hesap İste
-        </button>
+          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>
+            {table ? `Masa ${table.table_number}` : 'Yükleniyor…'}
+          </div>
 
-        <button
-          onClick={()=>window.location.href=`/t/${token}/menu`}
-          style={{padding:20,fontSize:18}}
-        >
-          Menüyü Gör
-        </button>
+          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+            <button
+              onClick={() => send('waiter')}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.10)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+              }}
+            >
+              <img src="/waiter-v2.png" alt="Garson" style={{ width: 28, height: 28 }} />
+              Garson Çağır
+            </button>
 
+            <button
+              onClick={() => send('bill')}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.10)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+              }}
+            >
+              <img src="/bill.png" alt="Hesap" style={{ width: 28, height: 28 }} />
+              Hesap İste
+            </button>
+
+            <a
+              href={`/t/${tableToken}/menu`}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                fontSize: 16,
+                fontWeight: 800,
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.10)',
+                color: 'white',
+                textDecoration: 'none',
+                textAlign: 'center'
+              }}
+            >
+              Menüyü Gör
+            </a>
+          </div>
+        </div>
       </div>
-
     </div>
   )
 }
