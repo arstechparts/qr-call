@@ -9,15 +9,23 @@ type Row = {
   table_token: string
 }
 
+const RESTAURANT_ID = 'demo' // şimdilik demo. sonra token’dan gerçek restaurant_id çözeceğiz.
+
 export default function Page() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
 
   async function load() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('restaurant_tables')
       .select('id, table_number, table_token')
+      .eq('restaurant_id', RESTAURANT_ID)
       .order('table_number', { ascending: true })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
 
     setRows((data as Row[]) || [])
   }
@@ -32,30 +40,33 @@ export default function Page() {
 
     // en büyük masa numarasını bul
     const maxNum = rows.reduce((m, r) => Math.max(m, r.table_number), 0)
-    const nextNum = maxNum + 1
+    let nextNum = maxNum + 1
 
-    const { error } = await supabase
-      .from('restaurant_tables')
-      .insert({ table_number: nextNum })
+    // 2 kere deneme (olası duplicate için)
+    for (let i = 0; i < 2; i++) {
+      const { error } = await supabase.from('restaurant_tables').insert({
+        restaurant_id: RESTAURANT_ID,
+        table_number: nextNum,
+      })
 
-    // duplicate (unique index) olduysa 1 arttırıp tekrar dene
-    if (error && (error as any).code === '23505') {
-      const { error: error2 } = await supabase
-        .from('restaurant_tables')
-        .insert({ table_number: nextNum + 1 })
-
-      if (error2) {
-        alert(error2.message)
+      if (!error) {
+        await load()
         setLoading(false)
         return
       }
-    } else if (error) {
+
+      // duplicate ise bir sonraki numarayı dene
+      if ((error as any).code === '23505') {
+        nextNum += 1
+        continue
+      }
+
       alert(error.message)
       setLoading(false)
       return
     }
 
-    await load()
+    alert('Masa eklenemedi (duplicate). Tekrar deneyin.')
     setLoading(false)
   }
 
@@ -64,11 +75,7 @@ export default function Page() {
       <h1>Masalar</h1>
 
       <div style={{ marginBottom: 20 }}>
-        <button
-          onClick={addNextTable}
-          style={{ padding: 10 }}
-          disabled={loading}
-        >
+        <button onClick={addNextTable} style={{ padding: 10 }} disabled={loading}>
           {loading ? 'Ekleniyor...' : 'Sıradaki Masayı Ekle'}
         </button>
       </div>
@@ -78,20 +85,21 @@ export default function Page() {
           key={r.id}
           style={{
             border: '1px solid #ddd',
-            padding: 10,
+            padding: 12,
             marginBottom: 10,
             display: 'flex',
             justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
-          <div>Masa {r.table_number}</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Masa {r.table_number}</div>
 
-          <div>
-            <a href={`/panel/tables/${r.id}`} style={{ marginRight: 10 }}>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <a href={`/panel/tables/${r.id}`} style={{ textDecoration: 'none' }}>
               QR Gör
             </a>
 
-            <a href={`/t/${r.table_token}`} target="_blank">
+            <a href={`/t/${r.table_token}`} target="_blank" style={{ textDecoration: 'none' }}>
               QR Link
             </a>
           </div>
