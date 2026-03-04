@@ -9,6 +9,102 @@ type TableRow = {
   restaurant_id: string
 }
 
+function CardButton({
+  title,
+  subtitle,
+  img,
+  onClick,
+  href
+}: {
+  title: string
+  subtitle: string
+  img?: string
+  onClick?: () => void
+  href?: string
+}) {
+  const common: React.CSSProperties = {
+    borderRadius: 22,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    overflow: 'hidden'
+  }
+
+  const inner = (
+    <div style={{ padding: 18 }}>
+      {img ? (
+        <div
+          style={{
+            width: '100%',
+            aspectRatio: '16 / 9',
+            borderRadius: 16,
+            overflow: 'hidden',
+            background: 'rgba(255,255,255,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <img
+            src={img}
+            alt={title}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            width: '100%',
+            aspectRatio: '16 / 9',
+            borderRadius: 16,
+            background: 'rgba(255,255,255,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 40,
+            fontWeight: 900
+          }}
+        >
+          Menü
+        </div>
+      )}
+
+      <div style={{ marginTop: 14, textAlign: 'center' }}>
+        <div style={{ fontSize: 28, fontWeight: 900 }}>{title}</div>
+        <div style={{ marginTop: 6, opacity: 0.8 }}>{subtitle}</div>
+      </div>
+    </div>
+  )
+
+  if (href) {
+    return (
+      <a href={href} style={{ ...common, display: 'block', color: 'white', textDecoration: 'none' }}>
+        {inner}
+      </a>
+    )
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...common,
+        display: 'block',
+        width: '100%',
+        padding: 0,
+        color: 'white',
+        textAlign: 'left',
+        cursor: 'pointer'
+      }}
+    >
+      {inner}
+    </button>
+  )
+}
+
 export default function Page() {
   const params = useParams()
   const incoming = (params?.table as string) || ''
@@ -20,7 +116,6 @@ export default function Page() {
     ;(async () => {
       setLoading(true)
 
-      // token ile dene
       const a = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
@@ -34,7 +129,6 @@ export default function Page() {
         return
       }
 
-      // table_token ile dene (UUID)
       const b = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
@@ -66,10 +160,10 @@ export default function Page() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+        <div style={{ maxWidth: 560, margin: '0 auto', paddingTop: 18 }}>
+          <div style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
             <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>Yükleniyor…</div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 8 }}>Yükleniyor…</div>
           </div>
         </div>
       </div>
@@ -79,10 +173,10 @@ export default function Page() {
   if (!table) {
     return (
       <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+        <div style={{ maxWidth: 560, margin: '0 auto', paddingTop: 18 }}>
+          <div style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
             <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>QR geçersiz</div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 8 }}>QR geçersiz</div>
             <div style={{ opacity: 0.8, marginTop: 6 }}>Bu QR kapalı ya da bulunamadı.</div>
           </div>
         </div>
@@ -92,79 +186,32 @@ export default function Page() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
-        <div
-          style={{
-            borderRadius: 18,
-            padding: 18,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)'
-          }}
-        >
+      <div style={{ maxWidth: 560, margin: '0 auto', paddingTop: 18 }}>
+        <div style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
           <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
+          <div style={{ fontSize: 44, fontWeight: 900, marginTop: 8 }}>Masa {table.table_number}</div>
+        </div>
 
-          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>
-            Masa {table.table_number}
-          </div>
+        <div style={{ display: 'grid', gap: 18, marginTop: 18 }}>
+          <CardButton
+            title="Garson Çağır"
+            subtitle="Lütfen butona tıklayınız"
+            img="/waiter-v2.png"
+            onClick={() => send('waiter')}
+          />
 
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <button
-              onClick={() => send('waiter')}
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                fontSize: 16,
-                fontWeight: 800,
-                cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.18)',
-                background: 'rgba(255,255,255,0.10)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12
-              }}
-            >
-              <img src="/waiter-v2.png" alt="Garson" style={{ width: 28, height: 28 }} />
-              Garson Çağır
-            </button>
+          <CardButton
+            title="Hesap İste"
+            subtitle="Lütfen butona tıklayınız"
+            img="/bill.png"
+            onClick={() => send('bill')}
+          />
 
-            <button
-              onClick={() => send('bill')}
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                fontSize: 16,
-                fontWeight: 800,
-                cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.18)',
-                background: 'rgba(255,255,255,0.10)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12
-              }}
-            >
-              <img src="/bill.png" alt="Hesap" style={{ width: 28, height: 28 }} />
-              Hesap İste
-            </button>
-
-            <a
-              href={`/t/${incoming}/menu`}
-              style={{
-                padding: 16,
-                borderRadius: 16,
-                fontSize: 16,
-                fontWeight: 800,
-                border: '1px solid rgba(255,255,255,0.18)',
-                background: 'rgba(255,255,255,0.10)',
-                color: 'white',
-                textDecoration: 'none',
-                textAlign: 'center'
-              }}
-            >
-              Menüyü Gör
-            </a>
-          </div>
+          <CardButton
+            title="Menüyü Gör"
+            subtitle="Menü ve fiyatlar"
+            href={`/t/${incoming}/menu`}
+          />
         </div>
       </div>
     </div>
