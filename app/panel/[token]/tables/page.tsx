@@ -4,21 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
-type Restaurant = {
-  id: string
-  name: string | null
-  panel_token: string
-}
-
-type TableRow = {
-  id: string
-  restaurant_id: string
-  table_number: number
-  table_token: string
-  token: string | null
-  is_active: boolean
-  created_at: string
-}
+type Restaurant = { id: string; name: string | null }
+type TableRow = { id: string; table_number: number; table_token: string; token: string | null }
 
 export default function TablesPage({ params }: { params: { token: string } }) {
   const panelToken = params.token
@@ -27,24 +14,21 @@ export default function TablesPage({ params }: { params: { token: string } }) {
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
-  const [err, setErr] = useState<string>('')
+  const [err, setErr] = useState('')
 
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://qr-call.vercel.app'
-
-  const nextNumber = useMemo(() => {
-    const max = rows.reduce((m, r) => (r.table_number > m ? r.table_number : m), 0)
-    return max + 1
-  }, [rows])
+  const origin = useMemo(() => {
+    if (typeof window === 'undefined') return 'https://qr-call.vercel.app'
+    return window.location.origin
+  }, [])
 
   async function loadAll() {
     setLoading(true)
     setErr('')
 
-    // 1) RESTAURANT BUL (panel_token ile!)
+    // restaurant bul
     const { data: r, error: rErr } = await supabase
       .from('restaurants')
-      .select('id,name,panel_token')
+      .select('id,name')
       .eq('panel_token', panelToken)
       .maybeSingle()
 
@@ -64,12 +48,12 @@ export default function TablesPage({ params }: { params: { token: string } }) {
       return
     }
 
-    setRestaurant(r as Restaurant)
+    setRestaurant(r)
 
-    // 2) MASALARI ÇEK
+    // sadece bu restaurant masaları
     const { data: t, error: tErr } = await supabase
       .from('restaurant_tables')
-      .select('id,restaurant_id,table_number,table_token,token,is_active,created_at')
+      .select('id,table_number,table_token,token')
       .eq('restaurant_id', r.id)
       .order('table_number', { ascending: true })
 
@@ -80,20 +64,34 @@ export default function TablesPage({ params }: { params: { token: string } }) {
       return
     }
 
-    setRows((t || []) as TableRow[])
+    setRows((t ?? []) as TableRow[])
     setLoading(false)
   }
 
-  async function addNextTable() {
+  useEffect(() => {
+    loadAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelToken])
+
+  async function addNext() {
     if (!restaurant) return
+    if (adding) return
+
     setAdding(true)
     setErr('')
 
-    // Sadece restaurant_id + table_number gönderiyoruz.
-    // token / table_token DB’de default/trigger ile dolmalı.
+    const maxNum = rows.reduce((m, x) => Math.max(m, Number(x.table_number || 0)), 0)
+    const nextNum = maxNum + 1
+
+    // DB bazen token/table_token NOT NULL istiyor -> biz dolduralım
+    const tokenText = crypto.randomUUID().replaceAll('-', '') // text
+    const tableTokenUuid = crypto.randomUUID() // uuid string
+
     const { error } = await supabase.from('restaurant_tables').insert({
       restaurant_id: restaurant.id,
-      table_number: nextNumber,
+      table_number: nextNum,
+      token: tokenText,
+      table_token: tableTokenUuid,
       is_active: true,
     })
 
@@ -107,105 +105,57 @@ export default function TablesPage({ params }: { params: { token: string } }) {
     setAdding(false)
   }
 
-  useEffect(() => {
-    loadAll()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelToken])
+  if (loading) return <div style={{ padding: 24 }}>Yükleniyor...</div>
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 20 }}>
-      <h1 style={{ marginBottom: 10 }}>Masalar</h1>
+    <div style={{ padding: 24, fontFamily: 'system-ui' }}>
+      <h1 style={{ margin: 0 }}>Masalar</h1>
+      <div style={{ opacity: 0.75, marginTop: 6 }}>
+        {restaurant?.name ?? ''} {restaurant ? '' : '(bulunamadı)'}
+      </div>
 
       <button
-        onClick={addNextTable}
+        onClick={addNext}
         disabled={!restaurant || adding}
-        style={{
-          padding: '12px 16px',
-          borderRadius: 10,
-          border: '1px solid #ddd',
-          background: adding ? '#f3f3f3' : 'white',
-          cursor: adding ? 'not-allowed' : 'pointer',
-          fontSize: 16,
-        }}
+        style={{ padding: '10px 14px', marginTop: 14, cursor: 'pointer' }}
       >
         {adding ? 'Ekleniyor...' : 'Sıradaki Masayı Ekle'}
       </button>
 
       {err ? (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            border: '1px solid #ffb4b4',
-            background: '#ffecec',
-            borderRadius: 10,
-            color: '#a40000',
-          }}
-        >
+        <div style={{ marginTop: 12, padding: 10, border: '1px solid #ffb4b4', background: '#ffecec', borderRadius: 10 }}>
           {err}
         </div>
       ) : null}
 
-      {loading ? (
-        <div style={{ marginTop: 20, opacity: 0.7 }}>Yükleniyor…</div>
-      ) : rows.length === 0 ? (
-        <div style={{ marginTop: 20, opacity: 0.7 }}>Henüz masa yok.</div>
-      ) : (
-        <div style={{ marginTop: 20 }}>
-          {rows.map((r) => {
-            const qrLink = `${origin}/t/${r.table_token}`
-            return (
-              <div
-                key={r.id}
-                style={{
-                  border: '1px solid #e5e5e5',
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                }}
-              >
-                <div style={{ fontSize: 18, fontWeight: 700 }}>Masa {r.table_number}</div>
+      <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+        {rows.map((r) => {
+          const customerUrl = `${origin}/t/${r.table_token}`
+          return (
+            <div
+              key={r.id}
+              style={{
+                border: '1px solid #ddd',
+                padding: 12,
+                borderRadius: 12,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'white',
+              }}
+            >
+              <div style={{ fontWeight: 800 }}>Masa {r.table_number}</div>
 
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <Link
-                    href={`/panel/${panelToken}/tables/${r.id}`}
-                    style={{
-                      padding: '10px 12px',
-                      border: '1px solid #ddd',
-                      borderRadius: 10,
-                      textDecoration: 'none',
-                      color: 'black',
-                      fontWeight: 600,
-                    }}
-                  >
-                    QR Gör
-                  </Link>
-
-                  <a
-                    href={qrLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      padding: '10px 12px',
-                      border: '1px solid #ddd',
-                      borderRadius: 10,
-                      textDecoration: 'none',
-                      color: 'black',
-                      fontWeight: 600,
-                    }}
-                  >
-                    QR Link
-                  </a>
-                </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Link href={`/panel/${panelToken}/tables/${r.id}`}>QR Gör</Link>
+                <a href={customerUrl} target="_blank" rel="noreferrer">
+                  QR Link
+                </a>
               </div>
-            )
-          })}
-        </div>
-      )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
