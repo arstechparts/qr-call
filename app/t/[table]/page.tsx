@@ -14,13 +14,15 @@ function CardButton({
   subtitle,
   img,
   onClick,
-  href
+  href,
+  cover = true
 }: {
   title: string
-  subtitle: string
+  subtitle?: string
   img?: string
   onClick?: () => void
   href?: string
+  cover?: boolean
 }) {
   const common: React.CSSProperties = {
     borderRadius: 18,
@@ -34,10 +36,10 @@ function CardButton({
       <div
         style={{
           width: '100%',
-          aspectRatio: '21 / 9', // ✅ daha kısa görsel alanı
+          aspectRatio: '21 / 9',
           borderRadius: 14,
           overflow: 'hidden',
-          background: 'rgba(255,255,255,0.06)',
+          background: 'rgba(255,255,255,0.04)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -50,17 +52,20 @@ function CardButton({
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover'
+              objectFit: cover ? 'cover' : 'contain', // ✅ garson kafa kesilmesin
+              objectPosition: 'center'
             }}
           />
         ) : (
-          <div style={{ fontSize: 28, fontWeight: 900 }}>Menü</div>
+          <div style={{ fontSize: 30, fontWeight: 900 }}>Menü</div>
         )}
       </div>
 
       <div style={{ marginTop: 10, textAlign: 'center' }}>
         <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
-        <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>{subtitle}</div>
+        {subtitle ? (
+          <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>{subtitle}</div>
+        ) : null}
       </div>
     </div>
   )
@@ -173,9 +178,10 @@ export default function Page() {
   return (
     <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 14 }}>
       <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 10 }}>
-        <div style={{ borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+        {/* ✅ Masa kutusu küçültüldü */}
+        <div style={{ borderRadius: 18, padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
           <div style={{ fontSize: 13, opacity: 0.85 }}>Premium</div>
-          <div style={{ fontSize: 34, fontWeight: 900, marginTop: 6 }}>Masa {table.table_number}</div>
+          <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>Masa {table.table_number}</div>
         </div>
 
         <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
@@ -183,6 +189,7 @@ export default function Page() {
             title="Garson Çağır"
             subtitle="Lütfen butona tıklayınız"
             img="/waiter-v2.png"
+            cover={false} // ✅ kafa kesilmesin
             onClick={() => send('waiter')}
           />
 
@@ -190,14 +197,12 @@ export default function Page() {
             title="Hesap İste"
             subtitle="Lütfen butona tıklayınız"
             img="/bill.png"
+            cover={true}
             onClick={() => send('bill')}
           />
 
-          <CardButton
-            title="Menüyü Gör"
-            subtitle="Menü ve fiyatlar"
-            href={`/t/${incoming}/menu`}
-          />
+          {/* ✅ Menü kartında alttaki ekstra yazılar kaldırıldı */}
+          <CardButton title="Menü" href={`/t/${incoming}/menu`} />
         </div>
       </div>
     </div>
