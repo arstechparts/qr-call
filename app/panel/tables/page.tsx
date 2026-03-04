@@ -1,61 +1,114 @@
 'use client'
 
-import { useState } from 'react'
-import QRCode from 'react-qr-code'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 
-export default function Tables(){
+type Row = {
+  id:string
+  table_number:number
+  table_token:string
+}
 
-  const [table,setTable] = useState('')
-  const [qr,setQr] = useState('')
+export default function Page(){
 
-  function create(){
+  const [rows,setRows] = useState<Row[]>([])
+  const [tableNumber,setTableNumber] = useState('')
 
-    const token = crypto.randomUUID()
+  async function load(){
 
-    setQr(token)
+    const {data} = await supabase
+      .from('restaurant_tables')
+      .select('*')
+      .order('table_number')
+
+    setRows(data || [])
+
   }
 
-  return (
+  useEffect(()=>{
+    load()
+  },[])
 
-    <div style={{padding:40,fontFamily:'sans-serif'}}>
+  async function addTable(){
 
-      <h1>QR Oluştur</h1>
+    if(!tableNumber) return
 
-      <div style={{marginTop:30}}>
+    await supabase
+      .from('restaurant_tables')
+      .insert({
+        table_number:Number(tableNumber)
+      })
+
+    setTableNumber('')
+    load()
+
+  }
+
+  return(
+
+    <div style={{padding:40}}>
+
+      <h1>Masalar</h1>
+
+      <div style={{marginBottom:20}}>
 
         <input
           placeholder="Masa numarası"
-          value={table}
-          onChange={e=>setTable(e.target.value)}
-          style={{padding:10,fontSize:16}}
+          value={tableNumber}
+          onChange={e=>setTableNumber(e.target.value)}
+          style={{padding:10,marginRight:10}}
         />
 
         <button
-          onClick={create}
-          style={{marginLeft:10,padding:10}}
+          onClick={addTable}
+          style={{padding:10}}
         >
-          QR oluştur
+          Masa Ekle
         </button>
 
       </div>
 
-      {qr && (
+      {rows.map(r=>(
 
-        <div style={{marginTop:40}}>
+        <div
+          key={r.id}
+          style={{
+            border:'1px solid #ddd',
+            padding:10,
+            marginBottom:10,
+            display:'flex',
+            justifyContent:'space-between'
+          }}
+        >
 
-          <QRCode value={`https://qr-call.vercel.app/t/${qr}`} />
+          <div>
+            Masa {r.table_number}
+          </div>
 
-          <div style={{marginTop:20}}>
+          <div>
 
-            https://qr-call.vercel.app/t/{qr}
+            <a
+              href={`/panel/tables/${r.id}`}
+              style={{marginRight:10}}
+            >
+              QR Gör
+            </a>
+
+            <a
+              href={`/t/${r.table_token}`}
+              target="_blank"
+            >
+              QR Link
+            </a>
 
           </div>
 
         </div>
 
-      )}
+      ))}
 
     </div>
 
   )
+
 }
