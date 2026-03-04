@@ -22,6 +22,33 @@ function Card({
   onClick?: () => void
   href?: string
 }) {
+  const image = (
+    <div
+      style={{
+        width: '100%',
+        aspectRatio: '21 / 9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {img ? (
+        <img
+          src={img}
+          alt={title}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center'
+          }}
+        />
+      ) : (
+        <div style={{ fontSize: 34, fontWeight: 900 }}>Menü</div>
+      )}
+    </div>
+  )
+
   const body = (
     <div
       style={{
@@ -31,39 +58,18 @@ function Card({
         overflow: 'hidden'
       }}
     >
-      <div
-        style={{
-          width: '100%',
-          aspectRatio: '21 / 9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        {img ? (
-          <img
-            src={img}
-            alt={title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain', // ✅ hepsi aynı
-              objectPosition: 'center'
-            }}
-          />
-        ) : (
-          <div style={{ fontSize: 34, fontWeight: 900 }}>Menü</div>
-        )}
-      </div>
+      {image}
 
-      <div style={{ padding: '10px 0 14px 0', textAlign: 'center' }}>
-        <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
-        {subtitle ? (
-          <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
-            {subtitle}
-          </div>
-        ) : null}
-      </div>
+      {img ? (
+        <div style={{ padding: '10px 0 14px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
+          {subtitle ? (
+            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+              {subtitle}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 
@@ -132,7 +138,9 @@ export default function Page() {
 
   if (!table) {
     return (
-      <div style={{ color: 'white', padding: 20 }}>QR geçersiz</div>
+      <div style={{ color: 'white', padding: 20 }}>
+        QR geçersiz
+      </div>
     )
   }
 
@@ -145,39 +153,4 @@ export default function Page() {
         color: 'white'
       }}
     >
-      <div style={{ maxWidth: 520, margin: '0 auto' }}>
-        <div
-          style={{
-            borderRadius: 18,
-            padding: '10px 14px',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)'
-          }}
-        >
-          <div style={{ fontSize: 13, opacity: 0.8 }}>Premium</div>
-          <div style={{ fontSize: 30, fontWeight: 900 }}>
-            Masa {table.table_number}
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-          <Card
-            title="Garson Çağır"
-            subtitle="Lütfen butona tıklayınız"
-            img="/waiter-v2.png"
-            onClick={() => send('waiter')}
-          />
-
-          <Card
-            title="Hesap İste"
-            subtitle="Lütfen butona tıklayınız"
-            img="/bill.png"
-            onClick={() => send('bill')}
-          />
-
-          <Card title="Menü" href={`/t/${token}/menu`} />
-        </div>
-      </div>
-    </div>
-  )
-}
+      <div style={{ maxWidth: 520, margin:
