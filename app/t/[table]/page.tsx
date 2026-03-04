@@ -24,6 +24,7 @@ function Card({
   href?: string
   hideText?: boolean
 }) {
+
   const body = (
     <div
       style={{
@@ -42,19 +43,16 @@ function Card({
           justifyContent: 'center'
         }}
       >
-        {img ? (
+        {img && (
           <img
             src={img}
             alt={title}
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'contain',
-              objectPosition: 'center'
+              objectFit: 'contain'
             }}
           />
-        ) : (
-          <div style={{ fontSize: 34, fontWeight: 900 }}>Menü</div>
         )}
       </div>
 
@@ -103,13 +101,16 @@ function Card({
 }
 
 export default function Page() {
+
   const params = useParams()
   const token = (params?.table as string) || ''
 
   const [table, setTable] = useState<TableRow | null>(null)
 
   useEffect(() => {
+
     ;(async () => {
+
       const { data } = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
@@ -118,10 +119,13 @@ export default function Page() {
         .maybeSingle()
 
       if (data) setTable(data as TableRow)
+
     })()
+
   }, [token])
 
   async function send(type: 'waiter' | 'bill') {
+
     if (!table) return
 
     await supabase.from('requests').insert({
@@ -143,6 +147,7 @@ export default function Page() {
   }
 
   return (
+
     <div
       style={{
         minHeight: '100vh',
@@ -151,9 +156,50 @@ export default function Page() {
         color: 'white'
       }}
     >
+
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
+
         <div
           style={{
             borderRadius: 18,
             padding: '10px 14px',
-            background: 'rgba(255,255,255,0.
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.10)'
+          }}
+        >
+          <div style={{ fontSize: 13, opacity: 0.8 }}>Premium</div>
+          <div style={{ fontSize: 30, fontWeight: 900 }}>
+            Masa {table.table_number}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+
+          <Card
+            title="Garson Çağır"
+            subtitle="Lütfen butona tıklayınız"
+            img="/waiter-v2.png"
+            onClick={() => send('waiter')}
+          />
+
+          <Card
+            title="Hesap İste"
+            subtitle="Lütfen butona tıklayınız"
+            img="/bill.png"
+            onClick={() => send('bill')}
+          />
+
+          {/* Menü kartı */}
+          <Card
+            img="/menu.png"
+            href={`/t/${token}/menu`}
+            hideText={true}
+          />
+
+        </div>
+
+      </div>
+
+    </div>
+  )
+}
