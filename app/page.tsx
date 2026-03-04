@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-import PanelClient from './panel-client'
+import { redirect } from 'next/navigation'
 
-export default function PanelPage() {
-  return <PanelClient />
+export default function HomePage() {
+  redirect('/panel')
 }
-=======
->>>>>>> bef842b (fix: clean panel structure and restore premium UI)
