@@ -23,27 +23,27 @@ function CardButton({
   href?: string
 }) {
   const common: React.CSSProperties = {
-    borderRadius: 22,
+    borderRadius: 18,
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.10)',
     overflow: 'hidden'
   }
 
   const inner = (
-    <div style={{ padding: 18 }}>
-      {img ? (
-        <div
-          style={{
-            width: '100%',
-            aspectRatio: '16 / 9',
-            borderRadius: 16,
-            overflow: 'hidden',
-            background: 'rgba(255,255,255,0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
+    <div style={{ padding: 12 }}>
+      <div
+        style={{
+          width: '100%',
+          aspectRatio: '21 / 9', // ✅ daha kısa görsel alanı
+          borderRadius: 14,
+          overflow: 'hidden',
+          background: 'rgba(255,255,255,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        {img ? (
           <img
             src={img}
             alt={title}
@@ -53,28 +53,14 @@ function CardButton({
               objectFit: 'cover'
             }}
           />
-        </div>
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            aspectRatio: '16 / 9',
-            borderRadius: 16,
-            background: 'rgba(255,255,255,0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 40,
-            fontWeight: 900
-          }}
-        >
-          Menü
-        </div>
-      )}
+        ) : (
+          <div style={{ fontSize: 28, fontWeight: 900 }}>Menü</div>
+        )}
+      </div>
 
-      <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <div style={{ fontSize: 28, fontWeight: 900 }}>{title}</div>
-        <div style={{ marginTop: 6, opacity: 0.8 }}>{subtitle}</div>
+      <div style={{ marginTop: 10, textAlign: 'center' }}>
+        <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
+        <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>{subtitle}</div>
       </div>
     </div>
   )
@@ -159,11 +145,11 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-        <div style={{ maxWidth: 560, margin: '0 auto', paddingTop: 18 }}>
-          <div style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 8 }}>Yükleniyor…</div>
+      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 14 }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 12 }}>
+          <div style={{ borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>Premium</div>
+            <div style={{ fontSize: 26, fontWeight: 900, marginTop: 6 }}>Yükleniyor…</div>
           </div>
         </div>
       </div>
@@ -172,12 +158,12 @@ export default function Page() {
 
   if (!table) {
     return (
-      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-        <div style={{ maxWidth: 560, margin: '0 auto', paddingTop: 18 }}>
-          <div style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 8 }}>QR geçersiz</div>
-            <div style={{ opacity: 0.8, marginTop: 6 }}>Bu QR kapalı ya da bulunamadı.</div>
+      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 14 }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 12 }}>
+          <div style={{ borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>Premium</div>
+            <div style={{ fontSize: 26, fontWeight: 900, marginTop: 6 }}>QR geçersiz</div>
+            <div style={{ opacity: 0.8, marginTop: 6, fontSize: 13 }}>Bu QR kapalı ya da bulunamadı.</div>
           </div>
         </div>
       </div>
@@ -185,14 +171,14 @@ export default function Page() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
-      <div style={{ maxWidth: 560, margin: '0 auto', paddingTop: 18 }}>
-        <div style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-          <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
-          <div style={{ fontSize: 44, fontWeight: 900, marginTop: 8 }}>Masa {table.table_number}</div>
+    <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 14 }}>
+      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 10 }}>
+        <div style={{ borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+          <div style={{ fontSize: 13, opacity: 0.85 }}>Premium</div>
+          <div style={{ fontSize: 34, fontWeight: 900, marginTop: 6 }}>Masa {table.table_number}</div>
         </div>
 
-        <div style={{ display: 'grid', gap: 18, marginTop: 18 }}>
+        <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
           <CardButton
             title="Garson Çağır"
             subtitle="Lütfen butona tıklayınız"
