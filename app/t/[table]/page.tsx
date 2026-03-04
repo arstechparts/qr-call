@@ -20,7 +20,7 @@ export default function Page() {
     ;(async () => {
       setLoading(true)
 
-      // 1) Önce TEXT token ile dene
+      // token ile dene
       const a = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
@@ -34,7 +34,7 @@ export default function Page() {
         return
       }
 
-      // 2) Olmazsa UUID table_token ile dene
+      // table_token ile dene (UUID)
       const b = await supabase
         .from('restaurant_tables')
         .select('table_number, restaurant_id')
@@ -65,36 +65,107 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-        <b>Premium v2</b>
-        <div>Yükleniyor…</div>
+      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>Yükleniyor…</div>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!table) {
     return (
-      <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-        <b>Premium v2</b>
-        <div>QR geçersiz</div>
-        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>Param: {incoming}</div>
+      <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+          <div style={{ borderRadius: 18, padding: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>QR geçersiz</div>
+            <div style={{ opacity: 0.8, marginTop: 6 }}>Bu QR kapalı ya da bulunamadı.</div>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-      <b>Premium v2</b>
-      <h1>Masa {table.table_number}</h1>
+    <div style={{ minHeight: '100vh', background: '#070A12', color: 'white', padding: 18 }}>
+      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 18 }}>
+        <div
+          style={{
+            borderRadius: 18,
+            padding: 18,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.10)'
+          }}
+        >
+          <div style={{ fontSize: 14, opacity: 0.85 }}>Premium</div>
 
-      <div style={{ display: 'grid', gap: 20, marginTop: 30 }}>
-        <button onClick={() => send('waiter')} style={{ padding: 20, fontSize: 18 }}>
-          Garson Çağır
-        </button>
+          <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>
+            Masa {table.table_number}
+          </div>
 
-        <button onClick={() => send('bill')} style={{ padding: 20, fontSize: 18 }}>
-          Hesap İste
-        </button>
+          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+            <button
+              onClick={() => send('waiter')}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.10)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+              }}
+            >
+              <img src="/waiter-v2.png" alt="Garson" style={{ width: 28, height: 28 }} />
+              Garson Çağır
+            </button>
+
+            <button
+              onClick={() => send('bill')}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.10)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+              }}
+            >
+              <img src="/bill.png" alt="Hesap" style={{ width: 28, height: 28 }} />
+              Hesap İste
+            </button>
+
+            <a
+              href={`/t/${incoming}/menu`}
+              style={{
+                padding: 16,
+                borderRadius: 16,
+                fontSize: 16,
+                fontWeight: 800,
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.10)',
+                color: 'white',
+                textDecoration: 'none',
+                textAlign: 'center'
+              }}
+            >
+              Menüyü Gör
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   )
