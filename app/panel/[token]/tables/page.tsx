@@ -11,31 +11,28 @@ type TableRow = {
   table_number: number
   table_token: string
   is_active: boolean
-  created_at: string
 }
 
 export default function TablesPage({ params }: { params: { token: string } }) {
   const panelToken = params.token
 
   const [loading, setLoading] = useState(true)
-  const [busyAdd, setBusyAdd] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
-  const [rows, setRows] = useState<TableRow[]>([])
+  const [tables, setTables] = useState<TableRow[]>([])
+  const [adding, setAdding] = useState(false)
 
-  const baseUrl = useMemo(() => {
-    return (
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (typeof window !== 'undefined' ? window.location.origin : '')
-    )
+  const base = useMemo(() => {
+    // NEXT_PUBLIC_APP_URL varsa onu kullan; yoksa current origin
+    return process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
   }, [])
 
-  async function loadAll() {
+  async function load() {
     setLoading(true)
     setErr(null)
 
-    // 1) restaurant by panel_token
+    // 1) panel_token -> restaurant bul
     const r = await supabase
       .from('restaurants')
       .select('id, name, panel_token')
@@ -45,7 +42,7 @@ export default function TablesPage({ params }: { params: { token: string } }) {
 
     if (r.error || !r.data) {
       setRestaurant(null)
-      setRows([])
+      setTables([])
       setErr('Panel bulunamadı (restaurant yok).')
       setLoading(false)
       return
@@ -53,110 +50,125 @@ export default function TablesPage({ params }: { params: { token: string } }) {
 
     setRestaurant(r.data as Restaurant)
 
-    // 2) tables by restaurant_id
+    // 2) restaurant_id -> masaları çek
     const t = await supabase
       .from('restaurant_tables')
-      .select('id, restaurant_id, table_number, table_token, is_active, created_at')
+      .select('id, restaurant_id, table_number, table_token, is_active')
       .eq('restaurant_id', r.data.id)
       .order('table_number', { ascending: true })
 
     if (t.error) {
       setErr(t.error.message)
-      setRows([])
+      setTables([])
     } else {
-      setRows((t.data as TableRow[]) || [])
+      setTables((t.data || []) as TableRow[])
     }
 
     setLoading(false)
   }
 
   useEffect(() => {
-    loadAll()
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelToken])
 
   async function addNextTable() {
     if (!restaurant) return
-    setBusyAdd(true)
+    setAdding(true)
     setErr(null)
 
-    const maxNum = rows.reduce((m, x) => Math.max(m, x.table_number), 0)
+    const maxNum = tables.reduce((m, x) => Math.max(m, x.table_number), 0)
     const nextNum = maxNum + 1
 
     const ins = await supabase.from('restaurant_tables').insert({
-      restaurant_id: restaurant.id,
+      restaurant_id: restaurant.id, // <-- ASLA "demo" değil!
       table_number: nextNum,
       is_active: true,
-      // table_token DB default üretiyorsa boş bırak
     })
-
-    setBusyAdd(false)
 
     if (ins.error) {
       setErr(ins.error.message)
+      setAdding(false)
       return
     }
 
-    await loadAll()
+    await load()
+    setAdding(false)
   }
 
-  if (loading) return <div style={{ padding: 16 }}>Yükleniyor…</div>
+  if (loading) return <div style={{ padding: 24 }}>Yükleniyor…</div>
 
   return (
-    <div style={{ padding: 16, maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>Masalar</div>
-          <div style={{ opacity: 0.7 }}>
-            {restaurant ? restaurant.name : '(bulunamadı)'}
-          </div>
-        </div>
+    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto' }}>
+      <h2 style={{ marginBottom: 8 }}>Masalar {restaurant ? `(${restaurant.name})` : '(bulunamadı)'}</h2>
 
-        <button
-          onClick={addNextTable}
-          disabled={!restaurant || busyAdd}
-          style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #ddd' }}
-        >
-          {busyAdd ? 'Ekleniyor…' : 'Sıradaki Masayı Ekle'}
-        </button>
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <Link href={`/panel/${panelToken}`} style={{ marginRight: 12 }}>
-          Panele dön
-        </Link>
-        <Link href={`/panel/${panelToken}/requests`}>İstekler</Link>
-      </div>
+      <button
+        onClick={addNextTable}
+        disabled={!restaurant || adding}
+        style={{
+          padding: '10px 14px',
+          borderRadius: 10,
+          border: '1px solid #ddd',
+          background: '#fff',
+          cursor: 'pointer',
+          marginBottom: 16,
+        }}
+      >
+        {adding ? 'Ekleniyor…' : 'Sıradaki Masayı Ekle'}
+      </button>
 
       {err && (
-        <div style={{ marginTop: 14, padding: 12, border: '1px solid #f3b3b3', background: '#ffecec', borderRadius: 10, color: '#8a1f1f' }}>
+        <div style={{ padding: 12, border: '1px solid #f5b5b5', background: '#ffecec', borderRadius: 10, marginBottom: 16 }}>
           {err}
         </div>
       )}
 
-      <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
-        {rows.length === 0 ? (
-          <div style={{ opacity: 0.7 }}>Henüz masa yok.</div>
-        ) : (
-          rows.map((r) => {
-            const customerUrl = `${baseUrl}/t/${r.table_token}`
-            return (
-              <div key={r.id} style={{ padding: 14, border: '1px solid #ddd', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div style={{ fontWeight: 800, fontSize: 18 }}>Masa {r.table_number}</div>
+      {tables.length === 0 ? (
+        <div>Henüz masa yok.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {tables.map((r) => {
+            const customerUrl = `${base}/t/${r.table_token}`
 
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <Link href={`/panel/${panelToken}/tables/${r.id}`} style={{ padding: '8px 10px', border: '1px solid #ddd', borderRadius: 10 }}>
+            return (
+              <div
+                key={r.id}
+                style={{
+                  border: '1px solid #ddd',
+                  borderRadius: 12,
+                  padding: 14,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>Masa {r.table_number}</div>
+
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  {/* QR Gör sayfası */}
+                  <Link href={`/panel/${panelToken}/tables/${r.id}`} style={{ textDecoration: 'none' }}>
                     QR Gör
                   </Link>
 
-                  <a href={customerUrl} target="_blank" rel="noreferrer" style={{ padding: '8px 10px', border: '1px solid #ddd', borderRadius: 10 }}>
+                  {/* QR Link (müşteri linki) */}
+                  <a href={customerUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
                     QR Link
                   </a>
                 </div>
               </div>
             )
-          })
-        )}
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 18 }}>
+        <Link href={`/panel/${panelToken}`} style={{ textDecoration: 'none' }}>
+          ← Panele dön
+        </Link>
+        {'  '}|{'  '}
+        <Link href={`/panel/${panelToken}/requests`} style={{ textDecoration: 'none' }}>
+          İstekler
+        </Link>
       </div>
     </div>
   )
