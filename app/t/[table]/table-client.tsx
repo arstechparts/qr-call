@@ -19,6 +19,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
   const [loading, setLoading] = useState(true)
   const [invalid, setInvalid] = useState(false)
   const [row, setRow] = useState<TableRow | null>(null)
+  const [panelToken, setPanelToken] = useState<string | null>(null)
   const [sending, setSending] = useState<'waiter' | 'bill' | null>(null)
 
   const bgStyle = useMemo(
@@ -39,12 +40,11 @@ export default function TableClient({ incoming }: { incoming: string }) {
     ;(async () => {
       setLoading(true)
       setInvalid(false)
+      setPanelToken(null)
 
       const incomingTrim = (incoming || '').trim()
       const uuid = isUuidLike(incomingTrim)
 
-      // Hem yeni sistem (table_token uuid) hem eski (token text) destek:
-      // restaurant_tables: table_token UUID, token TEXT (bazı eski kayıtlarda)
       let query = supabase
         .from('restaurant_tables')
         .select('id, table_number, restaurant_id, table_token, is_active')
@@ -59,9 +59,29 @@ export default function TableClient({ incoming }: { incoming: string }) {
       if (error || !data || data.is_active === false) {
         setInvalid(true)
         setRow(null)
-      } else {
-        setRow(data as TableRow)
+        setLoading(false)
+        return
       }
+
+      const tableRow = data as TableRow
+      setRow(tableRow)
+
+      // ✅ restaurant_id -> restaurants.panel_token çek
+      const { data: rData, error: rErr } = await supabase
+        .from('restaurants')
+        .select('panel_token')
+        .eq('id', tableRow.restaurant_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (!alive) return
+
+      if (!rErr && rData?.panel_token) {
+        setPanelToken(rData.panel_token as string)
+      } else {
+        setPanelToken(null)
+      }
+
       setLoading(false)
     })()
 
@@ -74,16 +94,13 @@ export default function TableClient({ incoming }: { incoming: string }) {
     if (!row) return
     setSending(type)
 
-    // ✅ KRİTİK: table_token (uuid) requests'e yazılmalı
-    const payload = {
+    const { error } = await supabase.from('requests').insert({
       restaurant_id: row.restaurant_id,
       table_number: row.table_number,
-      table_token: row.table_token, // ✅ ekledik
+      table_token: row.table_token, // ✅ KRİTİK
       request_type: type,
       status: 'waiting',
-    }
-
-    const { error } = await supabase.from('requests').insert(payload)
+    })
 
     setSending(null)
 
@@ -91,7 +108,14 @@ export default function TableClient({ incoming }: { incoming: string }) {
       alert(error.message)
       return
     }
-    alert('Gönderildi ✅')
+
+    // ✅ TEST/DEMO için: basınca panele götür
+    if (panelToken) {
+      window.location.href = `/panel/${panelToken}/requests`
+      return
+    }
+
+    alert('Gönderildi ✅ (panel_token yok, panele yönlendiremedim)')
   }
 
   if (loading) {
@@ -189,6 +213,10 @@ export default function TableClient({ incoming }: { incoming: string }) {
           <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 6 }}>Premium</div>
           <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: -1 }}>
             Masa {row.table_number}
+          </div>
+          {/* sadece debug */}
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.6 }}>
+            {panelToken ? `Panel hazır ✅` : `Panel token yok (restaurants.panel_token boş olabilir)`}
           </div>
         </div>
 
