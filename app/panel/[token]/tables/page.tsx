@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
 type RestaurantRow = {
   id: string
   name: string
-  panel_token: string
+  panel_token: string | null
 }
 
 type TableRow = {
@@ -22,17 +23,11 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
   const panelToken = params.token
 
   const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
-  const [adding, setAdding] = useState(false)
-
-  const [qrOpen, setQrOpen] = useState(false)
-  const [qrUrl, setQrUrl] = useState<string>('')
-  const [qrTitle, setQrTitle] = useState<string>('')
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qr-call.vercel.app'
 
   const bgStyle = useMemo(
     () => ({
@@ -48,21 +43,12 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
   )
 
   const cardStyle: React.CSSProperties = {
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     color: '#fff',
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.12)',
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
-  }
-
-  const btnStyle: React.CSSProperties = {
-    borderRadius: 16,
-    padding: '12px 14px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    color: '#fff',
-    fontWeight: 700,
   }
 
   async function loadAll() {
@@ -87,11 +73,11 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
 
     setRestaurant(r as RestaurantRow)
 
-    // 2) tables çek
+    // 2) masaları çek
     const { data: t, error: tErr } = await supabase
       .from('restaurant_tables')
       .select('id, restaurant_id, table_number, table_token, is_active, created_at')
-      .eq('restaurant_id', r.id)
+      .eq('restaurant_id', (r as RestaurantRow).id)
       .order('table_number', { ascending: true })
 
     if (tErr) {
@@ -101,7 +87,7 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
       return
     }
 
-    setTables((t || []) as TableRow[])
+    setTables((t ?? []) as TableRow[])
     setLoading(false)
   }
 
@@ -118,12 +104,28 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
   }, [panelToken])
 
   async function addNextTable() {
+    if (!restaurant) {
+      setErr('Restaurant bulunamadı (panel token yanlış olabilir).')
+      return
+    }
+
     setAdding(true)
     setErr(null)
 
-    // SQL fonksiyonu: add_next_table_by_panel(p_panel_token text)
-    const { data, error } = await supabase.rpc('add_next_table_by_panel', {
-      p_panel_token: panelToken,
+    const nextNumber =
+      tables.length > 0 ? Math.max(...tables.map(t => t.table_number)) + 1 : 1
+
+    // UUID üret
+    const newToken =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`
+
+    const { error } = await supabase.from('restaurant_tables').insert({
+      restaurant_id: restaurant.id,
+      table_number: nextNumber,
+      table_token: newToken,
+      is_active: true,
     })
 
     setAdding(false)
@@ -133,181 +135,131 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
       return
     }
 
-    // data tek satır döner
     await loadAll()
-  }
-
-  function openQr(table: TableRow) {
-    const url = `${appUrl}/t/${table.table_token}`
-    setQrTitle(`Masa ${table.table_number}`)
-    setQrUrl(url)
-    setQrOpen(true)
-  }
-
-  async function downloadQr() {
-    try {
-      // ücretsiz QR servis (gör / indir hızlı)
-      const img = `https://api.qrserver.com/v1/create-qr-code/?size=900x900&data=${encodeURIComponent(
-        qrUrl
-      )}`
-
-      const res = await fetch(img)
-      const blob = await res.blob()
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `${qrTitle.replaceAll(' ', '_')}.png`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(a.href)
-    } catch (e: any) {
-      alert('İndirme hatası: ' + (e?.message || 'Bilinmeyen hata'))
-    }
   }
 
   return (
     <div style={bgStyle}>
-      <div style={{ width: '100%', maxWidth: 720, display: 'grid', gap: 14 }}>
-        {/* Header */}
-        <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ width: '100%', maxWidth: 760, display: 'grid', gap: 14 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <Link href={`/panel/${panelToken}`} style={{ textDecoration: 'none' }}>
+            <div style={{ ...cardStyle, padding: '12px 16px', cursor: 'pointer' }}>Panel</div>
+          </Link>
+          <Link href={`/panel/${panelToken}/requests`} style={{ textDecoration: 'none' }}>
+            <div style={{ ...cardStyle, padding: '12px 16px', cursor: 'pointer' }}>İstekler</div>
+          </Link>
+          <div style={{ ...cardStyle, padding: '12px 16px', opacity: 0.9 }}>Masalar</div>
+        </div>
+
+        <div style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 6 }}>Masalar</div>
-            <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: -0.6 }}>
-              {restaurant ? restaurant.name : '—'}
+            <div style={{ fontSize: 22, fontWeight: 900 }}>Masalar</div>
+            <div style={{ marginTop: 6, fontSize: 14, opacity: 0.8 }}>
+              {restaurant ? `${restaurant.name}` : 'Yükleniyor...'}
             </div>
           </div>
 
-          <button onClick={addNextTable} style={btnStyle} disabled={adding || !restaurant}>
+          <button
+            onClick={addNextTable}
+            disabled={adding || !restaurant}
+            style={{
+              borderRadius: 16,
+              padding: '14px 16px',
+              border: '1px solid rgba(255,255,255,0.18)',
+              background: adding ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.10)',
+              color: '#fff',
+              fontWeight: 800,
+              cursor: adding ? 'not-allowed' : 'pointer',
+              minWidth: 170,
+            }}
+          >
             {adding ? 'Ekleniyor…' : 'Masa Ekle (+1)'}
           </button>
         </div>
 
-        {/* Error */}
         {err && (
           <div
             style={{
               ...cardStyle,
-              border: '1px solid rgba(255,0,80,0.45)',
-              background: 'rgba(255,0,80,0.10)',
-              color: '#ffd7e3',
+              border: '1px solid rgba(255,80,80,0.35)',
+              background: 'rgba(255,0,0,0.08)',
+              color: '#ffd7d7',
             }}
           >
             {err}
           </div>
         )}
 
-        {/* List */}
         <div style={cardStyle}>
           {loading ? (
-            <div style={{ opacity: 0.85, fontSize: 16 }}>Yükleniyor…</div>
+            <div style={{ opacity: 0.85 }}>Yükleniyor…</div>
           ) : tables.length === 0 ? (
-            <div style={{ opacity: 0.85, fontSize: 16 }}>Henüz masa yok.</div>
+            <div style={{ opacity: 0.85 }}>Henüz masa yok.</div>
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
-              {tables.map((t) => (
-                <div
-                  key={t.id}
-                  style={{
-                    borderRadius: 18,
-                    padding: 12,
-                    border: '1px solid rgba(255,255,255,0.10)',
-                    background: 'rgba(255,255,255,0.04)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                  }}
-                >
-                  <div style={{ display: 'grid' }}>
-                    <div style={{ fontWeight: 900, fontSize: 18 }}>Masa {t.table_number}</div>
-                    <div style={{ opacity: 0.75, fontSize: 12, wordBreak: 'break-all' }}>
+              {tables.map(t => {
+                const customerLink = `https://qr-call.vercel.app/t/${t.table_token}`
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      borderRadius: 18,
+                      padding: 14,
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      background: 'rgba(255,255,255,0.04)',
+                      display: 'grid',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ fontSize: 18, fontWeight: 900 }}>Masa {t.table_number}</div>
+                      <div style={{ fontSize: 13, opacity: 0.75 }}>
+                        {t.is_active ? 'aktif' : 'pasif'}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: 13, opacity: 0.8, wordBreak: 'break-all' }}>
                       token: {t.table_token}
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={btnStyle} onClick={() => openQr(t)}>
-                      QR Görüntüle
-                    </button>
                     <a
-                      href={`${appUrl}/t/${t.table_token}`}
+                      href={customerLink}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ ...btnStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                      style={{
+                        display: 'inline-block',
+                        marginTop: 6,
+                        textDecoration: 'none',
+                        borderRadius: 14,
+                        padding: '10px 12px',
+                        border: '1px solid rgba(255,255,255,0.18)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        fontWeight: 800,
+                        width: 'fit-content',
+                      }}
                     >
-                      Link Aç
+                      QR / Müşteri Linkini Aç
                     </a>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
 
-        {/* QR Modal */}
-        {qrOpen && (
-          <div
-            onClick={() => setQrOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.55)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 16,
-              zIndex: 9999,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 520,
-                borderRadius: 22,
-                padding: 16,
-                background: '#0b1220',
-                border: '1px solid rgba(255,255,255,0.14)',
-                boxShadow: '0 30px 80px rgba(0,0,0,0.55)',
-                color: '#fff',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 14, opacity: 0.75 }}>QR</div>
-                  <div style={{ fontSize: 24, fontWeight: 900 }}>{qrTitle}</div>
-                </div>
-                <button style={btnStyle} onClick={() => setQrOpen(false)}>
-                  Kapat
-                </button>
-              </div>
-
-              <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', background: '#fff' }}>
-                <img
-                  alt="QR"
-                  style={{ width: '100%', display: 'block' }}
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=900x900&data=${encodeURIComponent(qrUrl)}`}
-                />
-              </div>
-
-              <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12, wordBreak: 'break-all' }}>{qrUrl}</div>
-
-              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                <button style={btnStyle} onClick={downloadQr}>
-                  QR İndir
-                </button>
-                <a
-                  href={qrUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ ...btnStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                >
-                  Link Aç
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
+        <button
+          onClick={loadAll}
+          style={{
+            ...cardStyle,
+            cursor: 'pointer',
+            textAlign: 'center',
+            fontWeight: 900,
+            padding: 14,
+          }}
+        >
+          Yenile
+        </button>
       </div>
     </div>
   )
