@@ -19,20 +19,35 @@ type RequestRow = {
   completed_at?: string | null
 }
 
-// ✅ Türkiye sabit UTC+3 (Intl timezone bazı ortamlarda sapıtıyor)
+// ✅ KESİN TR SAAT (UTC + 3) — Intl yok, sapıtmaz
 function formatTR(iso?: string | null) {
   if (!iso) return ''
-  const utc = new Date(iso)
-  const tr = new Date(utc.getTime() + 3 * 60 * 60 * 1000)
 
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const yyyy = tr.getUTCFullYear()
-  const mm = pad(tr.getUTCMonth() + 1)
-  const dd = pad(tr.getUTCDate())
-  const hh = pad(tr.getUTCHours())
-  const mi = pad(tr.getUTCMinutes())
-  const ss = pad(tr.getUTCSeconds())
+  const utcMs = Date.parse(iso)
+  if (Number.isNaN(utcMs)) return ''
 
+  const trMs = utcMs + 3 * 60 * 60 * 1000
+  const s = new Date(trMs).toISOString() // trMs'i UTC gibi yazar ama biz zaten +3 verdik
+
+  const yyyy = s.slice(0, 4)
+  const mm = s.slice(5, 7)
+  const dd = s.slice(8, 10)
+  const hh = s.slice(11, 13)
+  const mi = s.slice(14, 16)
+  const ss = s.slice(17, 19)
+
+  return `${dd}.${mm}.${yyyy} ${hh}:${mi}:${ss}`
+}
+
+function formatTRNow() {
+  const trMs = Date.now() + 3 * 60 * 60 * 1000
+  const s = new Date(trMs).toISOString()
+  const yyyy = s.slice(0, 4)
+  const mm = s.slice(5, 7)
+  const dd = s.slice(8, 10)
+  const hh = s.slice(11, 13)
+  const mi = s.slice(14, 16)
+  const ss = s.slice(17, 19)
   return `${dd}.${mm}.${yyyy} ${hh}:${mi}:${ss}`
 }
 
@@ -126,7 +141,6 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
       setWaiting([])
       setHistory([])
 
-      // 1) panel_token ile restoranı bul
       const { data: r, error: rErr } = await supabase
         .from('restaurants')
         .select('id, name, panel_token')
@@ -143,8 +157,6 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
       }
 
       setRestaurant(r as RestaurantRow)
-
-      // 2) mevcut istekleri yükle
       await loadAll((r as RestaurantRow).id)
 
       setLoading(false)
@@ -159,7 +171,6 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
   useEffect(() => {
     if (!restaurant?.id) return
 
-    // ✅ realtime subscribe (INSERT/UPDATE)
     const channel = supabase
       .channel(`requests:${restaurant.id}`)
       .on(
@@ -244,7 +255,7 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
             <div style={{ opacity: 0.7, fontSize: 12 }}>Panel</div>
             <div style={{ fontSize: 28, fontWeight: 900 }}>{restaurant.name}</div>
             <div style={{ marginTop: 6, fontSize: 13, opacity: 0.75 }}>
-              Son güncelleme: {formatTR(new Date().toISOString())}
+              Şu an (TR): {formatTRNow()}
             </div>
           </div>
 
