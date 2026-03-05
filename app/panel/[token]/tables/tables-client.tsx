@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 type RestaurantRow = {
@@ -20,202 +20,228 @@ type TableRow = {
 
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
-  const [adding, setAdding] = useState(false)
 
-  async function load() {
+  const [qrOpen, setQrOpen] = useState(false)
+  const [qrUrl, setQrUrl] = useState<string>('')
+
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://qr-call.vercel.app'
+
+  const loadAll = async () => {
     setLoading(true)
-    setErr(null)
+    setErrorMsg(null)
 
-    // 1) restaurant
-    const { data: r, error: re } = await supabase.rpc('get_restaurant_by_panel_token', {
-      p_panel_token: panelToken,
-    })
+    // 1) Restaurant bul (panel_token ile)
+    const r = await supabase
+      .from('restaurants')
+      .select('id,name,panel_token')
+      .eq('panel_token', panelToken)
+      .maybeSingle()
 
-    const rr = Array.isArray(r) ? r[0] : null
-
-    if (re || !rr) {
+    if (r.error) {
       setRestaurant(null)
       setTables([])
-      setErr('Restaurant bulunamadı (panel token yanlış olabilir).')
+      setErrorMsg(r.error.message)
       setLoading(false)
       return
     }
 
-    setRestaurant(rr as RestaurantRow)
-
-    // 2) tables
-    const { data: t, error: te } = await supabase.rpc('list_tables_by_panel', {
-      p_panel_token: panelToken,
-    })
-
-    if (te) {
+    if (!r.data) {
+      setRestaurant(null)
       setTables([])
-      setErr(te.message)
-    } else {
-      setTables(((t as any[]) || []) as TableRow[])
+      setErrorMsg('Restaurant bulunamadı (panel token yanlış olabilir).')
+      setLoading(false)
+      return
     }
 
+    setRestaurant(r.data)
+
+    // 2) Masaları çek
+    const t = await supabase
+      .from('restaurant_tables')
+      .select('id,restaurant_id,table_number,table_token,is_active,created_at')
+      .eq('restaurant_id', r.data.id)
+      .order('table_number', { ascending: true })
+
+    if (t.error) {
+      setTables([])
+      setErrorMsg(t.error.message)
+      setLoading(false)
+      return
+    }
+
+    setTables((t.data ?? []) as any)
     setLoading(false)
   }
 
   useEffect(() => {
-    load()
+    loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelToken])
 
-  async function addNextTable() {
-    if (adding) return
-    setAdding(true)
-    setErr(null)
+  const openQr = (tableToken: string) => {
+    const url = `${appUrl}/t/${tableToken}`
+    setQrUrl(url)
+    setQrOpen(true)
+  }
 
-    const { error } = await supabase.rpc('add_next_table_by_panel', {
+  const downloadQr = async (tableToken: string, tableNumber: number) => {
+    const url = `${appUrl}/t/${tableToken}`
+    const imgSrc = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
+      url
+    )}`
+
+    const res = await fetch(imgSrc)
+    const blob = await res.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `masa-${tableNumber}.png`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(a.href)
+  }
+
+  const addNextTable = async () => {
+    if (!panelToken) return
+    setAdding(true)
+    setErrorMsg(null)
+
+    // RPC param adı SQL’deki ile aynı olmalı: p_panel_token
+    const { data, error } = await supabase.rpc('add_next_table_by_panel', {
       p_panel_token: panelToken,
     })
 
     if (error) {
-      setErr(error.message)
+      setErrorMsg(error.message)
       setAdding(false)
       return
     }
 
-    await load()
+    // insert başarılı -> yeniden yükle
+    await loadAll()
     setAdding(false)
+
+    // otomatik yeni ekleneni QR açmak istersen:
+    // if (Array.isArray(data) && data[0]?.table_token) openQr(data[0].table_token)
   }
 
+  const title = useMemo(() => {
+    if (loading) return 'Yükleniyor...'
+    if (!restaurant) return 'Masalar'
+    return `Masalar`
+  }, [loading, restaurant])
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        padding: 16,
-        background:
-          'radial-gradient(1200px 700px at 50% 0%, rgba(255,255,255,0.10), rgba(0,0,0,0)),' +
-          'linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%)',
-        display: 'flex',
-        justifyContent: 'center',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: 680, display: 'grid', gap: 14 }}>
-        <div
-          style={{
-            borderRadius: 24,
-            padding: 18,
-            color: '#fff',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 900 }}>Masalar</div>
-            <div style={{ marginTop: 6, opacity: 0.7, fontSize: 14 }}>
-              {loading ? 'Yükleniyor…' : restaurant ? 'Hazır' : '—'}
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-3xl px-4 py-6">
+        <div className="rounded-3xl bg-[#0b1220] p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-3xl font-semibold">{title}</div>
+              {restaurant ? (
+                <div className="mt-1 text-white/70 text-sm">
+                  {restaurant.name}
+                </div>
+              ) : null}
             </div>
+
+            <button
+              onClick={addNextTable}
+              disabled={adding || loading || !restaurant}
+              className="rounded-2xl px-5 py-3 font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-40"
+            >
+              {adding ? 'Ekleniyor...' : 'Masa Ekle (+1)'}
+            </button>
           </div>
 
-          <button
-            onClick={addNextTable}
-            disabled={loading || !restaurant || adding}
-            style={{
-              borderRadius: 18,
-              padding: '14px 16px',
-              border: '1px solid rgba(255,255,255,0.18)',
-              background: 'rgba(255,255,255,0.08)',
-              color: '#fff',
-              fontWeight: 800,
-              cursor: loading || !restaurant || adding ? 'not-allowed' : 'pointer',
-              minWidth: 170,
-            }}
-          >
-            {adding ? 'Ekleniyor…' : 'Masa Ekle (+1)'}
-          </button>
-        </div>
+          {errorMsg ? (
+            <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-red-100">
+              {errorMsg}
+            </div>
+          ) : null}
 
-        {err && (
-          <div
-            style={{
-              borderRadius: 24,
-              padding: 18,
-              color: '#fff',
-              background: 'rgba(255,80,80,0.08)',
-              border: '1px solid rgba(255,80,80,0.35)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
-            }}
-          >
-            {err}
-          </div>
-        )}
-
-        <div
-          style={{
-            borderRadius: 24,
-            padding: 18,
-            color: '#fff',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
-          }}
-        >
-          {!loading && tables.length === 0 ? (
-            <div style={{ opacity: 0.8 }}>Henüz masa yok.</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {tables.map((t) => (
+          <div className="mt-6 space-y-3">
+            {tables.length === 0 ? (
+              <div className="rounded-2xl bg-white/5 p-4 text-white/70">
+                Henüz masa yok.
+              </div>
+            ) : (
+              tables.map((t) => (
                 <div
                   key={t.id}
-                  style={{
-                    borderRadius: 18,
-                    padding: 14,
-                    border: '1px solid rgba(255,255,255,0.10)',
-                    background: 'rgba(255,255,255,0.04)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                  }}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 p-4"
                 >
-                  <div style={{ fontSize: 18, fontWeight: 800 }}>Masa {t.table_number}</div>
+                  <div>
+                    <div className="text-lg font-semibold">Masa {t.table_number}</div>
+                    <div className="text-xs text-white/60 break-all">
+                      {t.table_token}
+                    </div>
+                  </div>
 
-                  <button
-                    onClick={() => window.open(`/t/${t.table_token}`, '_blank')}
-                    style={{
-                      borderRadius: 14,
-                      padding: '10px 12px',
-                      border: '1px solid rgba(255,255,255,0.18)',
-                      background: 'rgba(255,255,255,0.08)',
-                      color: '#fff',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    QR Görüntüle
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openQr(t.table_token)}
+                      className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15"
+                    >
+                      QR Görüntüle
+                    </button>
+
+                    <button
+                      onClick={() => downloadQr(t.table_token, t.table_number)}
+                      className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15"
+                    >
+                      QR İndir
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
 
-        <button
-          onClick={load}
-          style={{
-            borderRadius: 24,
-            padding: 18,
-            color: '#fff',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            fontWeight: 900,
-            cursor: 'pointer',
-          }}
-        >
-          Yenile
-        </button>
+        {/* QR Modal */}
+        {qrOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-4">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold">QR</div>
+                <button
+                  onClick={() => setQrOpen(false)}
+                  className="rounded-lg px-3 py-1 bg-black/5"
+                >
+                  Kapat
+                </button>
+              </div>
+
+              <div className="mt-3 rounded-xl bg-black/5 p-3">
+                <img
+                  alt="QR"
+                  className="w-full rounded-lg"
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
+                    qrUrl
+                  )}`}
+                />
+              </div>
+
+              <div className="mt-3 text-xs break-all text-black/70">{qrUrl}</div>
+
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(qrUrl)
+                }}
+                className="mt-3 w-full rounded-xl px-4 py-2 bg-black text-white"
+              >
+                Linki Kopyala
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )
