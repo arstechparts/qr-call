@@ -54,6 +54,13 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     return numbers.filter((n) => !tableByNumber.has(n))
   }, [numbers, tableByNumber])
 
+  // ✅ Eğer Supabase request takılırsa butonlar sonsuza kadar pasif kalmasın
+  useEffect(() => {
+    if (!loading) return
+    const t = setTimeout(() => setLoading(false), 6000)
+    return () => clearTimeout(t)
+  }, [loading])
+
   async function loadAll() {
     setLoading(true)
     setError(null)
@@ -68,7 +75,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     const { data: r, error: rErr } = await supabase
       .from('restaurants')
       .select('id,name,panel_token')
-      .eq('panel_token', token) // ✅ trim’lenmiş token ile eşleştir
+      .eq('panel_token', token)
       .maybeSingle()
 
     if (rErr) {
@@ -148,7 +155,10 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   async function createTable(tableNumber: number) {
-    if (!restaurant) return
+    if (!restaurant) {
+      setError('Restaurant yok (panel token eşleşmedi).')
+      return
+    }
     if (tableByNumber.has(tableNumber)) return
 
     setWorking(true)
@@ -188,7 +198,9 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     await createTable(next)
   }
 
-  const canUse = !loading && !!restaurant && !working
+  // ✅ BUTON AKTİF KURALI:
+  // restaurant varsa ve working değilse aktif olsun (loading takılsa bile)
+  const canUse = !!restaurant && !working
 
   return (
     <div className="min-h-[70vh] w-full">
@@ -200,7 +212,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           border: '1px solid rgba(255,255,255,0.10)',
         }}
       >
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center justify-between gap-3 mb-2">
           <div>
             <div className="text-2xl font-bold text-white">Masalar</div>
             <div className="text-white/60 text-sm">{restaurant ? restaurant.name : '—'}</div>
@@ -220,16 +232,19 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           </button>
         </div>
 
+        {/* küçük debug */}
+        <div className="mb-3 text-[12px] text-white/40">
+          debug: token={token || '—'} | restaurant={restaurant ? 'OK' : 'NULL'} | loading=
+          {String(loading)} | working={String(working)}
+        </div>
+
         {error ? (
           <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 text-red-100 px-4 py-3">
             {error}
           </div>
         ) : null}
 
-        {/* ✅ “Restoran bulunamadı” yazısını ekrandan KALDIRDIK.
-            Restoran yoksa sadece butonlar pasif kalır. */}
-
-        <div className="mt-4 rounded-3xl bg-white/10 border border-white/10 overflow-hidden">
+        <div className="mt-2 rounded-3xl bg-white/10 border border-white/10 overflow-hidden">
           {loading ? (
             <div className="px-4 py-6 text-white/70">Yükleniyor...</div>
           ) : (
