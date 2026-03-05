@@ -1,7 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function RequestsPage({ params }: { params: { token: string } }) {
-  // Şimdilik requests ekranı ana panelin içinde çalışıyor gibi düşün:
-  // 404 olmasın diye ana panele yönlendiriyoruz.
+export default function Page({ params }: { params: { token: string } }) {
   redirect(`/panel/${params.token}`)
 }
