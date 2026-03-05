@@ -18,21 +18,41 @@ type TableRow = {
   created_at?: string
 }
 
+function getTokenFromPathname(pathname: string): string {
+  // /panel/{token}/tables  veya  /panel/{token}/tables/...
+  const m = pathname.match(/^\/panel\/([^/]+)\/tables(\/|$)/)
+  return m?.[1] ?? ''
+}
+
 export default function TablesClient({ panelToken }: { panelToken: string }) {
+  const [resolvedToken, setResolvedToken] = useState<string>('')
+
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
   const [working, setWorking] = useState<boolean>(false)
 
-  const tokenSafe = panelToken?.trim() || ''
-
-  // ✅ Token’ı sakla (menü token’sız sayfaya düşerse geri yönlendirmek için)
+  // ✅ Token resolve: prop > URL > localStorage
   useEffect(() => {
-    if (tokenSafe) localStorage.setItem('last_panel_token', tokenSafe)
-  }, [tokenSafe])
+    const prop = (panelToken || '').trim()
+    if (prop) {
+      setResolvedToken(prop)
+      localStorage.setItem('last_panel_token', prop)
+      return
+    }
 
-  // 1..34 sabit liste
+    const fromUrl = getTokenFromPathname(window.location.pathname)
+    if (fromUrl) {
+      setResolvedToken(fromUrl)
+      localStorage.setItem('last_panel_token', fromUrl)
+      return
+    }
+
+    const last = (localStorage.getItem('last_panel_token') || '').trim()
+    setResolvedToken(last)
+  }, [panelToken])
+
   const allNumbers = useMemo(() => Array.from({ length: 34 }, (_, i) => i + 1), [])
 
   const tableByNumber = useMemo(() => {
@@ -41,11 +61,12 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     return m
   }, [tables])
 
-  async function loadAll() {
+  async function loadAll(token: string) {
     setLoading(true)
     setError('')
 
     try {
+      const tokenSafe = (token || '').trim()
       if (!tokenSafe) {
         setRestaurant(null)
         setTables([])
@@ -53,7 +74,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         return
       }
 
-      // Restaurant bul
+      // restaurant bul
       const r = await supabase
         .from('restaurants')
         .select('id,name,panel_token')
@@ -71,7 +92,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
       setRestaurant(r.data as RestaurantRow)
 
-      // Masaları çek
+      // masaları çek
       const t = await supabase
         .from('restaurant_tables')
         .select('id,restaurant_id,table_number,table_token,is_active,created_at')
@@ -89,29 +110,26 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   useEffect(() => {
-    loadAll()
+    loadAll(resolvedToken)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tokenSafe])
+  }, [resolvedToken])
 
-  // Tek masa oluştur
   async function createTable(tableNumber: number) {
     if (!restaurant) return
+    if (tableByNumber.get(tableNumber)) return
 
     setWorking(true)
     setError('')
 
     try {
-      if (tableByNumber.get(tableNumber)) return
-
       const { error } = await supabase.from('restaurant_tables').insert({
         restaurant_id: restaurant.id,
         table_number: tableNumber,
         is_active: true,
       })
-
       if (error) throw error
 
-      await loadAll()
+      await loadAll(resolvedToken)
     } catch (e: any) {
       setError(e?.message || 'Masa oluşturulamadı')
     } finally {
@@ -119,16 +137,13 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     }
   }
 
-  // Eksik 1..34 oluştur
   async function ensureAllTables() {
     if (!restaurant) return
-
     setWorking(true)
     setError('')
 
     try {
       const missing = allNumbers.filter((n) => !tableByNumber.get(n))
-
       for (const n of missing) {
         // eslint-disable-next-line no-await-in-loop
         await createTable(n)
@@ -163,18 +178,15 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           </button>
         </div>
 
-        {/* HATA */}
         {!!error && (
           <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-100">
             {error}
           </div>
         )}
 
-        {/* MASA LİSTESİ */}
         <div className="mt-5 overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
           {allNumbers.map((n) => {
             const row = tableByNumber.get(n)
-
             return (
               <div
                 key={n}
@@ -209,7 +221,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         </div>
 
         <button
-          onClick={loadAll}
+          onClick={() => loadAll(resolvedToken)}
           className="mt-5 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
         >
           Yenile
