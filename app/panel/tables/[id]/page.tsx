@@ -1,57 +1,72 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import QRCode from 'react-qr-code'
-import Link from 'next/link'
-
-type Row = {
-  id: string
-  table_number: number
-  table_token: string | null
-  token: string | null
-}
+import QR from 'qrcode'
 
 export default function Page({ params }: { params: { id: string } }) {
-  const id = params.id
-  const [row, setRow] = useState<Row | null>(null)
 
-  const appUrl = useMemo(
-    () => process.env.NEXT_PUBLIC_APP_URL || 'https://qr-call.vercel.app',
-    []
-  )
+  const [table,setTable] = useState<any>(null)
 
   useEffect(() => {
-    ;(async () => {
-      const { data } = await supabase
-        .from('restaurant_tables')
-        .select('id,table_number,table_token,token')
-        .eq('id', id)
-        .maybeSingle()
 
-      setRow((data as Row) ?? null)
-    })()
-  }, [id])
+    async function load(){
 
-  if (!row) return <div style={{ padding: 16 }}>Masa bulunamadı.</div>
+      const {data} = await supabase
+      .from('restaurant_tables')
+      .select('*')
+      .eq('id',params.id)
+      .single()
 
-  const t = (row.table_token || row.token || '').toString()
-  const url = `${appUrl}/t/${t}`
+      setTable(data)
+
+    }
+
+    load()
+
+  },[])
+
+  if(!table){
+    return <div style={{padding:40}}>Yükleniyor...</div>
+  }
+
+  const url = `https://qr-call.vercel.app/t/${table.table_token}`
+
+  async function download(){
+
+    const png = await QR.toDataURL(url)
+
+    const a = document.createElement('a')
+    a.href = png
+    a.download = `masa-${table.table_number}.png`
+    a.click()
+
+  }
 
   return (
-    <div style={{ padding: 16 }}>
-      <Link href="/panel/tables">← Masalara Dön</Link>
-      <h1>Masa {row.table_number} QR</h1>
 
-      <div style={{ background: '#fff', padding: 16, display: 'inline-block', borderRadius: 12 }}>
-        <QRCode value={url} size={260} />
+    <div style={{padding:40}}>
+
+      <h1>Masa {table.table_number}</h1>
+
+      <div style={{background:'#fff',padding:20,width:320}}>
+        <QRCode value={url} size={280}/>
       </div>
 
-      <div style={{ marginTop: 10, wordBreak: 'break-all' }}>{url}</div>
+      <br/>
 
-      <button onClick={() => window.print()} style={{ marginTop: 12, padding: 12 }}>
-        Yazdır / PDF
+      <button onClick={download}>
+        QR indir
       </button>
+
+      <br/><br/>
+
+      <a href={url} target="_blank">
+        müşteri sayfası
+      </a>
+
     </div>
+
   )
 }
