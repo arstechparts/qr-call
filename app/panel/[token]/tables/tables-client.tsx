@@ -39,9 +39,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
   async function loadAll() {
     setLoading(true)
-    setError(null)
+    setError(null) // ✅ eski hatayı temizle
 
-    // 1) Restaurant'ı panel_token ile bul
     const { data: r, error: rErr } = await supabase
       .from('restaurants')
       .select('id,name,panel_token')
@@ -65,8 +64,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     }
 
     setRestaurant(r as RestaurantRow)
+    setError(null) // ✅ restaurant bulunduysa hata YOK
 
-    // 2) Masaları restaurant_id ile çek
     const { data: t, error: tErr } = await supabase
       .from('restaurant_tables')
       .select('id,restaurant_id,table_number,table_token,is_active,created_at')
@@ -91,9 +90,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
   async function addNextTable() {
     setAdding(true)
-    setError(null)
+    setError(null) // ✅ butona basınca da hatayı temizle
 
-    // RPC: Supabase SQL’de oluşturduğumuz fonksiyon
     const { data, error: rpcErr } = await supabase.rpc('add_next_table_by_panel', {
       p_panel_token: panelToken,
     })
@@ -104,7 +102,9 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       return
     }
 
-    // data: yeni eklenen satır
+    // ✅ RPC başarılıysa “restaurant bulunamadı” gibi eski hataları asla gösterme
+    setError(null)
+
     const row = data as TableRow
     setTables((prev) => {
       const next = [row, ...prev]
@@ -123,7 +123,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   function downloadQrPng() {
-    // Dış servisle QR PNG (paket kurmadan)
     const pngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(
       qrUrl
     )}`
@@ -190,7 +189,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         </div>
       </div>
 
-      {/* QR MODAL */}
       {qrOpen && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
