@@ -1,67 +1,82 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import QRCode from 'react-qr-code'
+import Link from 'next/link'
 
-type Row = {
-  id: string
-  restaurant_id: string
-  table_number: number
-  table_token: string | null
-  token: string | null
-}
+type Restaurant = { id: string; name: string; panel_token: string }
+type TableRow = { id: string; restaurant_id: string; table_number: number; table_token: string }
 
-export default function QrPage({ params }: { params: { token: string; id: string } }) {
+export default function TableQrPage({ params }: { params: { token: string; id: string } }) {
   const panelToken = params.token
-  const id = params.id
+  const tableId = params.id
 
-  const [row, setRow] = useState<Row | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
+  const [row, setRow] = useState<TableRow | null>(null)
 
-  const appUrl = useMemo(() => process.env.NEXT_PUBLIC_APP_URL || 'https://qr-call.vercel.app', [])
+  const baseUrl = useMemo(() => {
+    return (
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '')
+    )
+  }, [])
 
   useEffect(() => {
     ;(async () => {
-      const { data } = await supabase
-        .from('restaurant_tables')
-        .select('id,restaurant_id,table_number,table_token,token')
-        .eq('id', id)
+      setErr(null)
+
+      const r = await supabase
+        .from('restaurants')
+        .select('id, name, panel_token')
+        .eq('panel_token', panelToken)
+        .limit(1)
         .maybeSingle()
 
-      setRow((data as Row) ?? null)
+      if (r.error || !r.data) {
+        setErr('Panel bulunamadı (restaurant yok).')
+        return
+      }
+      setRestaurant(r.data as Restaurant)
+
+      const t = await supabase
+        .from('restaurant_tables')
+        .select('id, restaurant_id, table_number, table_token')
+        .eq('id', tableId)
+        .eq('restaurant_id', r.data.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (t.error || !t.data) {
+        setErr('Masa bulunamadı.')
+        return
+      }
+
+      setRow(t.data as TableRow)
     })()
-  }, [id])
+  }, [panelToken, tableId])
 
-  const url = useMemo(() => {
-    if (!row) return ''
-    const t = (row.table_token || row.token || '').toString()
-    return `${appUrl}/t/${t}`
-  }, [row, appUrl])
+  if (err) return <div style={{ padding: 16 }}>{err}</div>
+  if (!row || !restaurant) return <div style={{ padding: 16 }}>Yükleniyor…</div>
 
-  if (!row) return <div style={{ padding: 20 }}>Yükleniyor…</div>
+  const url = `${baseUrl}/t/${row.table_token}`
 
   return (
-    <div style={{ padding: 20, maxWidth: 900, margin: '0 auto', fontFamily: 'system-ui' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Masa {row.table_number} — QR</h1>
-          <div style={{ opacity: 0.7, marginTop: 6, wordBreak: 'break-all' }}>{url}</div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Link href={`/panel/${panelToken}/tables`} style={{ textDecoration: 'none' }}>
-            Masalara Dön
-          </Link>
-
-          <button onClick={() => window.print()} style={{ padding: '10px 14px', cursor: 'pointer' }}>
-            Yazdır / PDF
-          </button>
-        </div>
+    <div style={{ padding: 16, maxWidth: 720, margin: '0 auto' }}>
+      <div style={{ marginBottom: 12 }}>
+        <Link href={`/panel/${panelToken}/tables`}>← Masalara dön</Link>
       </div>
 
-      <div style={{ marginTop: 16, background: '#fff', padding: 18, borderRadius: 14, display: 'inline-block' }}>
-        <QRCode value={url} size={280} />
+      <h2 style={{ margin: 0 }}>Masa {row.table_number} QR</h2>
+      <div style={{ opacity: 0.7, marginTop: 6 }}>{restaurant.name}</div>
+
+      <div style={{ marginTop: 18, padding: 16, border: '1px solid #ddd', borderRadius: 12, display: 'inline-block', background: '#fff' }}>
+        <QRCode value={url} size={240} />
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <a href={url} target="_blank" rel="noreferrer">{url}</a>
       </div>
     </div>
   )
