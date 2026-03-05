@@ -5,8 +5,8 @@ import { supabase } from '@/lib/supabaseClient'
 
 type TableRow = {
   id: string
-  table_number: number
   restaurant_id: string
+  table_number: number
   table_token: string
   is_active: boolean
 }
@@ -40,35 +40,17 @@ export default function TableClient({ incoming }: { incoming: string }) {
       setInvalid(false)
       setRow(null)
 
-      // ✅ 1) UUID kolonuna normal eq ile dene ama array al (daha stabil)
-      const r1 = await supabase
-        .from('restaurant_tables')
-        .select('id, table_number, restaurant_id, table_token, is_active')
-        .eq('table_token', tableToken as any)
-        .limit(1)
-
-      let found = (r1.data && r1.data[0]) ? (r1.data[0] as any) : null
-      let err = r1.error
-
-      // ✅ 2) Eğer bulamadıysa token(text) kolonundan da dene (eski sistem fallback)
-      if (!found && !err) {
-        const r2 = await supabase
-          .from('restaurant_tables')
-          .select('id, table_number, restaurant_id, table_token, is_active')
-          .eq('token', tableToken)
-          .limit(1)
-
-        found = (r2.data && r2.data[0]) ? (r2.data[0] as any) : null
-        err = r2.error
-      }
+      const { data, error } = await supabase.rpc('get_table_by_token', { p_token: tableToken })
 
       if (!alive) return
 
-      if (err || !found || found.is_active === false) {
+      const found = (data && data[0]) ? (data[0] as TableRow) : null
+
+      if (error || !found || found.is_active === false) {
         setInvalid(true)
         setRow(null)
       } else {
-        setRow(found as TableRow)
+        setRow(found)
       }
 
       setLoading(false)
@@ -129,9 +111,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
             <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
               Bu QR kapalı ya da bulunamadı.
-            </div>
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.65 }}>
-              token: {tableToken}
             </div>
           </div>
         </div>
