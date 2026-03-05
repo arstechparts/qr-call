@@ -7,11 +7,13 @@ type TableRow = {
   id: string
   table_number: number
   restaurant_id: string
-  is_active: boolean | null
+  table_token: string // uuid string
+  is_active: boolean
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuidLike(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+}
 
 export default function TableClient({ incoming }: { incoming: string }) {
   const [loading, setLoading] = useState(true)
@@ -38,15 +40,19 @@ export default function TableClient({ incoming }: { incoming: string }) {
       setLoading(true)
       setInvalid(false)
 
-      const isUuid = UUID_RE.test(incoming)
+      const incomingTrim = (incoming || '').trim()
+      const uuid = isUuidLike(incomingTrim)
 
-      const builder = supabase
+      // Hem yeni sistem (table_token uuid) hem eski (token text) destek:
+      // restaurant_tables: table_token UUID, token TEXT (bazı eski kayıtlarda)
+      let query = supabase
         .from('restaurant_tables')
-        .select('id, table_number, restaurant_id, is_active')
+        .select('id, table_number, restaurant_id, table_token, is_active')
+        .limit(1)
 
-      const { data, error } = isUuid
-        ? await builder.eq('table_token', incoming).limit(1).maybeSingle()
-        : await builder.eq('token', incoming).limit(1).maybeSingle()
+      const { data, error } = uuid
+        ? await query.eq('table_token', incomingTrim).maybeSingle()
+        : await query.eq('token', incomingTrim).maybeSingle()
 
       if (!alive) return
 
@@ -56,7 +62,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
       } else {
         setRow(data as TableRow)
       }
-
       setLoading(false)
     })()
 
@@ -69,12 +74,16 @@ export default function TableClient({ incoming }: { incoming: string }) {
     if (!row) return
     setSending(type)
 
-    const { error } = await supabase.from('requests').insert({
+    // ✅ KRİTİK: table_token (uuid) requests'e yazılmalı
+    const payload = {
       restaurant_id: row.restaurant_id,
       table_number: row.table_number,
+      table_token: row.table_token, // ✅ ekledik
       request_type: type,
       status: 'waiting',
-    })
+    }
+
+    const { error } = await supabase.from('requests').insert(payload)
 
     setSending(null)
 
@@ -115,7 +124,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
               Bu QR kapalı ya da bulunamadı.
             </div>
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>gelen: {incoming}</div>
           </div>
         </div>
       </div>
@@ -131,7 +139,10 @@ export default function TableClient({ incoming }: { incoming: string }) {
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
   }
 
-  const actionCardStyle: React.CSSProperties = { ...cardStyle, padding: 22 }
+  const actionCardStyle: React.CSSProperties = {
+    ...cardStyle,
+    padding: 22,
+  }
 
   const imgWrapStyle: React.CSSProperties = {
     width: '100%',
@@ -143,9 +154,8 @@ export default function TableClient({ incoming }: { incoming: string }) {
   const imgStyle: React.CSSProperties = {
     width: '100%',
     height: 260,
-    objectFit: 'contain',
+    objectFit: 'cover',
     display: 'block',
-    background: 'transparent',
   }
 
   const titleStyle: React.CSSProperties = {
