@@ -15,34 +15,24 @@ type TableRow = {
   table_number: number
   table_token: string
   is_active: boolean
+  created_at?: string
+}
+
+function cx(...arr: Array<string | false | null | undefined>) {
+  return arr.filter(Boolean).join(' ')
 }
 
 export default function TablesClient({ panelToken }: { panelToken: string }) {
-  const APP_URL =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://qr-call.vercel.app'
-
-  const RANGE_MIN = 1
-  const RANGE_MAX = 34
-
-  const token = (panelToken || '').trim()
-
-  const [loading, setLoading] = useState(true)
-  const [working, setWorking] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
+  const [error, setError] = useState<string>('')
+  const [loading, setLoading] = useState<boolean>(true)
+  const [working, setWorking] = useState<boolean>(false)
 
-  const [qrOpen, setQrOpen] = useState(false)
-  const [qrTitle, setQrTitle] = useState('')
-  const [qrLink, setQrLink] = useState('')
-  const [qrImg, setQrImg] = useState('')
+  const tokenSafe = panelToken?.trim() || ''
 
-  const numbers = useMemo(() => {
-    const arr: number[] = []
-    for (let i = RANGE_MIN; i <= RANGE_MAX; i++) arr.push(i)
-    return arr
-  }, [])
+  // 1..34 sabit liste
+  const allNumbers = useMemo(() => Array.from({ length: 34 }, (_, i) => i + 1), [])
 
   const tableByNumber = useMemo(() => {
     const m = new Map<number, TableRow>()
@@ -50,297 +40,211 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     return m
   }, [tables])
 
-  const missingNumbers = useMemo(() => {
-    return numbers.filter((n) => !tableByNumber.has(n))
-  }, [numbers, tableByNumber])
-
-  // ✅ Eğer Supabase request takılırsa butonlar sonsuza kadar pasif kalmasın
-  useEffect(() => {
-    if (!loading) return
-    const t = setTimeout(() => setLoading(false), 6000)
-    return () => clearTimeout(t)
-  }, [loading])
-
   async function loadAll() {
     setLoading(true)
-    setError(null)
+    setError('')
 
-    if (!token) {
-      setRestaurant(null)
-      setTables([])
+    try {
+      if (!tokenSafe) {
+        setRestaurant(null)
+        setTables([])
+        setError('Panel token gelmedi (URL yanlış olabilir).')
+        return
+      }
+
+      // Restaurantı bul
+      const r = await supabase
+        .from('restaurants')
+        .select('id,name,panel_token')
+        .eq('panel_token', tokenSafe)
+        .maybeSingle()
+
+      if (r.error) throw r.error
+
+      if (!r.data) {
+        setRestaurant(null)
+        setTables([])
+        setError('Restaurant bulunamadı (panel token yanlış olabilir).')
+        return
+      }
+
+      setRestaurant(r.data as RestaurantRow)
+
+      // Masaları çek
+      const t = await supabase
+        .from('restaurant_tables')
+        .select('id,restaurant_id,table_number,table_token,is_active,created_at')
+        .eq('restaurant_id', r.data.id)
+        .order('table_number', { ascending: true })
+
+      if (t.error) throw t.error
+
+      setTables((t.data ?? []) as TableRow[])
+    } catch (e: any) {
+      setError(e?.message || 'Bilinmeyen hata')
+    } finally {
       setLoading(false)
-      return
     }
-
-    const { data: r, error: rErr } = await supabase
-      .from('restaurants')
-      .select('id,name,panel_token')
-      .eq('panel_token', token)
-      .maybeSingle()
-
-    if (rErr) {
-      setRestaurant(null)
-      setTables([])
-      setError(rErr.message)
-      setLoading(false)
-      return
-    }
-
-    if (!r) {
-      setRestaurant(null)
-      setTables([])
-      setLoading(false)
-      return
-    }
-
-    setRestaurant(r as RestaurantRow)
-
-    const { data: t, error: tErr } = await supabase
-      .from('restaurant_tables')
-      .select('id,restaurant_id,table_number,table_token,is_active')
-      .eq('restaurant_id', (r as RestaurantRow).id)
-      .order('table_number', { ascending: true })
-
-    if (tErr) {
-      setTables([])
-      setError(tErr.message)
-      setLoading(false)
-      return
-    }
-
-    setTables((t as TableRow[]) || [])
-    setLoading(false)
   }
 
   useEffect(() => {
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [tokenSafe])
 
-  function openQrModal(tableNumber: number, tableToken: string) {
-    const link = `${APP_URL}/t/${tableToken}`
-    const img = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
-      link
-    )}`
-
-    setQrTitle(`Masa ${tableNumber}`)
-    setQrLink(link)
-    setQrImg(img)
-    setQrOpen(true)
-  }
-
-  async function downloadQr() {
-    try {
-      const res = await fetch(qrImg)
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${qrTitle.replace(/\s+/g, '_')}.png`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-    } catch {
-      window.open(qrImg, '_blank')
-    }
-  }
-
-  function newUuid(): string {
-    // @ts-ignore
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random()
-      .toString(16)
-      .slice(2)}`
-  }
-
+  // Masa oluştur (tek)
   async function createTable(tableNumber: number) {
-    if (!restaurant) {
-      setError('Restaurant yok (panel token eşleşmedi).')
-      return
-    }
-    if (tableByNumber.has(tableNumber)) return
-
+    if (!restaurant) return
     setWorking(true)
-    setError(null)
+    setError('')
 
-    const payload = {
-      restaurant_id: restaurant.id,
-      table_number: tableNumber,
-      is_active: true,
-      table_token: newUuid(),
-    }
+    try {
+      // Aynı masa varsa tekrar oluşturma
+      const exist = tableByNumber.get(tableNumber)
+      if (exist) return
 
-    const { data, error: insErr } = await supabase
-      .from('restaurant_tables')
-      .insert(payload)
-      .select('id,restaurant_id,table_number,table_token,is_active')
-      .single()
+      const { data, error } = await supabase.rpc('add_table_by_panel', {
+        p_panel_token: tokenSafe,
+        p_table_number: tableNumber,
+      })
 
-    if (insErr) {
-      setError(insErr.message)
+      if (error) throw error
+
+      // RPC yoksa fallback insert (RLS kapalıysa çalışır)
+      if (!data) {
+        const ins = await supabase.from('restaurant_tables').insert({
+          restaurant_id: restaurant.id,
+          table_number: tableNumber,
+          is_active: true,
+        })
+        if (ins.error) throw ins.error
+      }
+
+      await loadAll()
+    } catch (e: any) {
+      setError(e?.message || 'Masa oluşturulamadı')
+    } finally {
       setWorking(false)
-      return
     }
-
-    setTables((prev) => {
-      const next = [...prev, data as TableRow]
-      next.sort((a, b) => a.table_number - b.table_number)
-      return next
-    })
-
-    setWorking(false)
   }
 
-  async function createNextMissing() {
-    const next = missingNumbers[0]
-    if (!next) return
-    await createTable(next)
+  // 1..34 hepsini oluştur (eksikleri)
+  async function ensureAllTables() {
+    if (!restaurant) return
+    setWorking(true)
+    setError('')
+
+    try {
+      // Eksik numaraları bul
+      const missing = allNumbers.filter((n) => !tableByNumber.get(n))
+
+      // Tek tek oluştur
+      for (const n of missing) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTable(n)
+      }
+    } finally {
+      setWorking(false)
+    }
   }
 
-  // ✅ BUTON AKTİF KURALI:
-  // restaurant varsa ve working değilse aktif olsun (loading takılsa bile)
-  const canUse = !!restaurant && !working
+  function openQr(tableToken: string) {
+    const url = `${window.location.origin}/t/${tableToken}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
 
   return (
-    <div className="min-h-[70vh] w-full">
-      <div
-        className="w-full rounded-[32px] p-4 md:p-6"
-        style={{
-          background:
-            'radial-gradient(1200px 600px at 20% 10%, rgba(255,255,255,0.10), transparent 60%), linear-gradient(180deg, #0b1220 0%, #060a12 100%)',
-          border: '1px solid rgba(255,255,255,0.10)',
-        }}
-      >
-        <div className="flex items-center justify-between gap-3 mb-2">
+    <div className="mx-auto w-full max-w-xl px-4 pb-10 pt-6">
+      <div className="rounded-3xl bg-white/5 p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] ring-1 ring-white/10">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-2xl font-bold text-white">Masalar</div>
-            <div className="text-white/60 text-sm">{restaurant ? restaurant.name : '—'}</div>
+            <div className="text-4xl font-extrabold tracking-tight text-white">Masalar</div>
+            <div className="mt-1 text-sm text-white/50">
+              {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
+            </div>
           </div>
 
           <button
-            onClick={createNextMissing}
-            disabled={!canUse || missingNumbers.length === 0}
-            className={`px-4 py-3 rounded-2xl font-semibold transition
-              ${
-                !canUse || missingNumbers.length === 0
-                  ? 'bg-white/10 text-white/40'
-                  : 'bg-white/15 text-white hover:bg-white/20'
-              }`}
+            onClick={ensureAllTables}
+            disabled={!restaurant || working || loading}
+            className={cx(
+              'rounded-2xl px-5 py-3 text-base font-semibold',
+              'bg-white/10 text-white ring-1 ring-white/10',
+              (!restaurant || working || loading) && 'opacity-40'
+            )}
           >
             Masa Ekle (1-34)
           </button>
         </div>
 
-        {/* küçük debug */}
-        <div className="mb-3 text-[12px] text-white/40">
-          debug: token={token || '—'} | restaurant={restaurant ? 'OK' : 'NULL'} | loading=
+        {/* DEBUG */}
+        <div className="mt-3 text-xs text-white/35">
+          debug: token={tokenSafe || '—'} | restaurant={restaurant ? restaurant.id : 'NULL'} | loading=
           {String(loading)} | working={String(working)}
         </div>
 
-        {error ? (
-          <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 text-red-100 px-4 py-3">
+        {/* ERROR */}
+        {!!error && (
+          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
             {error}
           </div>
-        ) : null}
+        )}
 
-        <div className="mt-2 rounded-3xl bg-white/10 border border-white/10 overflow-hidden">
-          {loading ? (
-            <div className="px-4 py-6 text-white/70">Yükleniyor...</div>
-          ) : (
-            <div>
-              {numbers.map((n) => {
-                const t = tableByNumber.get(n)
+        {/* LIST */}
+        <div className="mt-5 overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
+          {allNumbers.map((n) => {
+            const row = tableByNumber.get(n)
+            const isCreated = !!row
 
-                return (
-                  <div
-                    key={n}
-                    className="flex items-center justify-between gap-3 px-4 py-4 border-b border-white/10"
-                  >
-                    <div className="flex flex-col">
-                      <div className="text-white font-semibold text-lg">Masa {n}</div>
-                      <div className="text-white/60 text-sm">
-                        {t ? 'Oluşturuldu' : 'Henüz oluşturulmadı'}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {t ? (
-                        <button
-                          onClick={() => openQrModal(n, t.table_token)}
-                          className="px-3 py-2 rounded-xl bg-white/15 text-white font-semibold hover:bg-white/20"
-                        >
-                          QR Görüntüle
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => createTable(n)}
-                          disabled={!canUse}
-                          className={`px-3 py-2 rounded-xl font-semibold transition
-                            ${
-                              !canUse
-                                ? 'bg-white/10 text-white/40'
-                                : 'bg-white/15 text-white hover:bg-white/20'
-                            }`}
-                        >
-                          Oluştur
-                        </button>
-                      )}
-                    </div>
+            return (
+              <div
+                key={n}
+                className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 last:border-b-0"
+              >
+                <div>
+                  <div className="text-xl font-bold text-white">Masa {n}</div>
+                  <div className="text-sm text-white/55">
+                    {isCreated ? 'Oluşturuldu' : 'Henüz oluşturulmadı'}
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+                </div>
 
-      {qrOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style={{ background: 'rgba(0,0,0,0.60)' }}
-          onClick={() => setQrOpen(false)}
+                {isCreated ? (
+                  <button
+                    onClick={() => openQr(row!.table_token)}
+                    disabled={!restaurant || working || loading}
+                    className={cx(
+                      'rounded-2xl px-4 py-2 text-sm font-semibold',
+                      'bg-white/10 text-white ring-1 ring-white/10',
+                      (!restaurant || working || loading) && 'opacity-40'
+                    )}
+                  >
+                    QR Görüntüle
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => createTable(n)}
+                    disabled={!restaurant || working || loading}
+                    className={cx(
+                      'rounded-2xl px-4 py-2 text-sm font-semibold',
+                      'bg-white/10 text-white ring-1 ring-white/10',
+                      (!restaurant || working || loading) && 'opacity-40'
+                    )}
+                  >
+                    Oluştur
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <button
+          onClick={loadAll}
+          className="mt-5 w-full rounded-2xl bg-white/10 px-5 py-4 text-base font-semibold text-white ring-1 ring-white/10"
         >
-          <div
-            className="w-full max-w-sm rounded-3xl p-4"
-            style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-white font-bold text-lg">{qrTitle}</div>
-              <button
-                className="text-white/70 hover:text-white px-2"
-                onClick={() => setQrOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="rounded-2xl bg-white p-3 flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qrImg} alt="QR" className="w-full h-auto" />
-            </div>
-
-            <div className="mt-3 text-white/70 text-xs break-all">{qrLink}</div>
-
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={downloadQr}
-                className="flex-1 px-3 py-3 rounded-2xl bg-white/15 text-white font-semibold hover:bg-white/20"
-              >
-                QR İndir
-              </button>
-
-              <button
-                onClick={() => window.open(qrLink, '_blank')}
-                className="flex-1 px-3 py-3 rounded-2xl bg-white/15 text-white font-semibold hover:bg-white/20"
-              >
-                Link Aç
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+          Yenile
+        </button>
+      </div>
     </div>
   )
 }
