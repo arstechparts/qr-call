@@ -1,5 +1,5 @@
-import TablePremiumClient from './table-premium-client'
+import TableClient from './table-client'
 
 export default function Page({ params }: { params: { table: string } }) {
-  return <TablePremiumClient tableToken={params.table} />
+  return <TableClient incoming={params.table} />
 }
