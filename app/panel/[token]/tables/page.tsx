@@ -1,158 +1,171 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
-type Restaurant = { id: string; name: string; panel_token: string }
+type Restaurant = {
+  id: string
+  name: string
+  panel_token: string
+}
+
 type TableRow = {
   id: string
   restaurant_id: string
   table_number: number
   table_token: string
+  token: string | null
   is_active: boolean
+  created_at: string
 }
 
 export default function TablesPage({ params }: { params: { token: string } }) {
   const panelToken = params.token
 
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
-
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
 
-  const base = useMemo(() => {
-    // NEXT_PUBLIC_APP_URL varsa onu kullan; yoksa current origin
-    return process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+  const appUrl = useMemo(() => {
+    const u = process.env.NEXT_PUBLIC_APP_URL || 'https://qr-call.vercel.app'
+    return u.replace(/\/$/, '')
   }, [])
 
-  async function load() {
-    setLoading(true)
-    setErr(null)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      setErr(null)
 
-    // 1) panel_token -> restaurant bul
-    const r = await supabase
-      .from('restaurants')
-      .select('id, name, panel_token')
-      .eq('panel_token', panelToken)
-      .limit(1)
-      .maybeSingle()
+      const { data: r, error: rErr } = await supabase
+        .from('restaurants')
+        .select('id, name, panel_token')
+        .eq('panel_token', panelToken)
+        .maybeSingle()
 
-    if (r.error || !r.data) {
-      setRestaurant(null)
-      setTables([])
-      setErr('Panel bulunamadı (restaurant yok).')
+      if (!alive) return
+
+      if (rErr || !r) {
+        setRestaurant(null)
+        setTables([])
+        setErr('Panel bulunamadı (restaurant yok).')
+        setLoading(false)
+        return
+      }
+
+      setRestaurant(r as Restaurant)
+
+      const { data: t, error: tErr } = await supabase
+        .from('restaurant_tables')
+        .select('id, restaurant_id, table_number, table_token, token, is_active, created_at')
+        .eq('restaurant_id', r.id)
+        .order('table_number', { ascending: true })
+
+      if (!alive) return
+
+      if (tErr) {
+        setErr(tErr.message)
+        setTables([])
+      } else {
+        setTables((t || []) as TableRow[])
+      }
       setLoading(false)
-      return
+    })()
+
+    return () => {
+      alive = false
     }
+  }, [panelToken])
 
-    setRestaurant(r.data as Restaurant)
-
-    // 2) restaurant_id -> masaları çek
-    const t = await supabase
+  async function refreshTables(rid: string) {
+    const { data: t } = await supabase
       .from('restaurant_tables')
-      .select('id, restaurant_id, table_number, table_token, is_active')
-      .eq('restaurant_id', r.data.id)
+      .select('id, restaurant_id, table_number, table_token, token, is_active, created_at')
+      .eq('restaurant_id', rid)
       .order('table_number', { ascending: true })
 
-    if (t.error) {
-      setErr(t.error.message)
-      setTables([])
-    } else {
-      setTables((t.data || []) as TableRow[])
-    }
-
-    setLoading(false)
+    setTables((t || []) as TableRow[])
   }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelToken])
 
   async function addNextTable() {
     if (!restaurant) return
     setAdding(true)
     setErr(null)
 
-    const maxNum = tables.reduce((m, x) => Math.max(m, x.table_number), 0)
-    const nextNum = maxNum + 1
+    try {
+      const max = tables.reduce((m, x) => Math.max(m, x.table_number), 0)
+      const nextNum = max + 1
 
-    const ins = await supabase.from('restaurant_tables').insert({
-      restaurant_id: restaurant.id, // <-- ASLA "demo" değil!
-      table_number: nextNum,
-      is_active: true,
-    })
+      const tableTokenUuid = crypto.randomUUID() // uuid
+      const tokenText = tableTokenUuid.replaceAll('-', '') // text (NOT NULL ise kurtarır)
 
-    if (ins.error) {
-      setErr(ins.error.message)
+      const { error } = await supabase.from('restaurant_tables').insert({
+        restaurant_id: restaurant.id,
+        table_number: nextNum,
+        table_token: tableTokenUuid,
+        token: tokenText, // bazı tablolar NOT NULL istiyor
+        is_active: true,
+      })
+
+      if (error) {
+        setErr(error.message)
+        return
+      }
+
+      await refreshTables(restaurant.id)
+    } finally {
       setAdding(false)
-      return
     }
-
-    await load()
-    setAdding(false)
   }
 
-  if (loading) return <div style={{ padding: 24 }}>Yükleniyor…</div>
+  if (loading) return <div>Yükleniyor…</div>
 
   return (
-    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto' }}>
-      <h2 style={{ marginBottom: 8 }}>Masalar {restaurant ? `(${restaurant.name})` : '(bulunamadı)'}</h2>
+    <div>
+      <h2 style={{ margin: '6px 0 6px' }}>Masalar {restaurant ? `- ${restaurant.name}` : '(bulunamadı)'}</h2>
 
-      <button
-        onClick={addNextTable}
-        disabled={!restaurant || adding}
-        style={{
-          padding: '10px 14px',
-          borderRadius: 10,
-          border: '1px solid #ddd',
-          background: '#fff',
-          cursor: 'pointer',
-          marginBottom: 16,
-        }}
-      >
-        {adding ? 'Ekleniyor…' : 'Sıradaki Masayı Ekle'}
-      </button>
+      <div style={{ marginBottom: 12 }}>
+        <button onClick={addNextTable} disabled={!restaurant || adding}>
+          {adding ? 'Ekleniyor…' : 'Sıradaki Masayı Ekle'}
+        </button>
+      </div>
 
       {err && (
-        <div style={{ padding: 12, border: '1px solid #f5b5b5', background: '#ffecec', borderRadius: 10, marginBottom: 16 }}>
+        <div style={{ background: '#ffe6e6', border: '1px solid #ffb3b3', padding: 10, borderRadius: 8 }}>
           {err}
         </div>
       )}
 
-      {tables.length === 0 ? (
-        <div>Henüz masa yok.</div>
+      {!restaurant ? (
+        <div style={{ marginTop: 12 }}>Henüz masa yok.</div>
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
-          {tables.map((r) => {
-            const customerUrl = `${base}/t/${r.table_token}`
+        <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+          {tables.map((t) => {
+            const customerLink = `${appUrl}/t/${t.table_token}`
 
             return (
               <div
-                key={r.id}
+                key={t.id}
                 style={{
-                  border: '1px solid #ddd',
-                  borderRadius: 12,
-                  padding: 14,
+                  border: '1px solid #e5e5e5',
+                  borderRadius: 10,
+                  padding: 12,
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
                 }}
               >
-                <div style={{ fontWeight: 700 }}>Masa {r.table_number}</div>
+                <div style={{ fontWeight: 700 }}>Masa {t.table_number}</div>
 
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  {/* QR Gör sayfası */}
-                  <Link href={`/panel/${panelToken}/tables/${r.id}`} style={{ textDecoration: 'none' }}>
-                    QR Gör
-                  </Link>
-
-                  {/* QR Link (müşteri linki) */}
-                  <a href={customerUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <a href={customerLink} target="_blank" rel="noreferrer">
                     QR Link
+                  </a>
+                  <a href={customerLink} target="_blank" rel="noreferrer">
+                    QR Gör
                   </a>
                 </div>
               </div>
@@ -162,13 +175,7 @@ export default function TablesPage({ params }: { params: { token: string } }) {
       )}
 
       <div style={{ marginTop: 18 }}>
-        <Link href={`/panel/${panelToken}`} style={{ textDecoration: 'none' }}>
-          ← Panele dön
-        </Link>
-        {'  '}|{'  '}
-        <Link href={`/panel/${panelToken}/requests`} style={{ textDecoration: 'none' }}>
-          İstekler
-        </Link>
+        <a href={`/panel/${panelToken}/requests`}>İstekler</a>
       </div>
     </div>
   )
