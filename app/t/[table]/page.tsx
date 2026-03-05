@@ -21,8 +21,8 @@ export default function TablePremiumPage({ params }: { params: { table: string }
 
   const bgStyle = useMemo(
     () => ({
-      minHeight: '100vh',
-      padding: 16,
+      minHeight: '100svh',
+      padding: 14,
       background:
         'radial-gradient(1200px 700px at 50% 0%, rgba(255,255,255,0.10), rgba(0,0,0,0)),' +
         'linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%)',
@@ -86,7 +86,7 @@ export default function TablePremiumPage({ params }: { params: { table: string }
       <div style={bgStyle}>
         <div style={{ width: '100%', maxWidth: 520, color: '#fff', opacity: 0.9 }}>
           <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Premium</div>
-          <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
+          <div style={{ fontSize: 42, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
         </div>
       </div>
     )
@@ -119,8 +119,8 @@ export default function TablePremiumPage({ params }: { params: { table: string }
 
   // Kart ortak stili
   const cardStyle: React.CSSProperties = {
-    borderRadius: 28,
-    padding: 18,
+    borderRadius: 26,
+    padding: 16,
     color: '#fff',
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.12)',
@@ -129,26 +129,37 @@ export default function TablePremiumPage({ params }: { params: { table: string }
 
   const actionCardStyle: React.CSSProperties = {
     ...cardStyle,
-    padding: 22,
+    padding: 18,
   }
 
+  // İç çerçeve YOK: sadece overflow hidden ile görsel sığsın
   const imgWrapStyle: React.CSSProperties = {
     width: '100%',
-    borderRadius: 22,
+    borderRadius: 20,
     overflow: 'hidden',
     background: 'transparent',
   }
 
-  const imgStyle: React.CSSProperties = {
+  // Scroll olmasın diye yükseklik biraz düşürüldü
+  const imgStyleCover: React.CSSProperties = {
     width: '100%',
-    height: 260,
+    height: 210,
     objectFit: 'cover',
     display: 'block',
   }
 
+  // Garsonun yüzü kesilmesin diye "contain"
+  const imgStyleContain: React.CSSProperties = {
+    width: '100%',
+    height: 210,
+    objectFit: 'contain',
+    display: 'block',
+    background: 'transparent',
+  }
+
   const titleStyle: React.CSSProperties = {
-    marginTop: 14,
-    fontSize: 34,
+    marginTop: 12,
+    fontSize: 32,
     fontWeight: 900,
     letterSpacing: -0.6,
     textAlign: 'center',
@@ -156,7 +167,7 @@ export default function TablePremiumPage({ params }: { params: { table: string }
 
   const subtitleStyle: React.CSSProperties = {
     marginTop: 6,
-    fontSize: 18,
+    fontSize: 16,
     opacity: 0.8,
     textAlign: 'center',
   }
@@ -170,13 +181,16 @@ export default function TablePremiumPage({ params }: { params: { table: string }
     color: 'inherit',
   }
 
+  // Cache kırmak için tek yerden versiyon
+  const v = 'v=5'
+
   return (
     <div style={bgStyle}>
-      <div style={{ width: '100%', maxWidth: 560, display: 'grid', gap: 16 }}>
-        {/* Üst başlık (daha küçük) */}
-        <div style={{ ...cardStyle, padding: 16 }}>
-          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 6 }}>Premium</div>
-          <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: -1 }}>
+      <div style={{ width: '100%', maxWidth: 560, display: 'grid', gap: 12 }}>
+        {/* Üst başlık (küçültüldü) */}
+        <div style={{ ...cardStyle, padding: 14 }}>
+          <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 6 }}>Premium</div>
+          <div style={{ fontSize: 38, fontWeight: 900, letterSpacing: -1 }}>
             Masa {row.table_number}
           </div>
         </div>
@@ -189,7 +203,7 @@ export default function TablePremiumPage({ params }: { params: { table: string }
         >
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
-              <img src="/waiter-v2.png" alt="Garson" style={imgStyle} />
+              <img src={`/waiter-v2.png?${v}`} alt="Garson" style={imgStyleContain} />
             </div>
             <div style={titleStyle}>Garson Çağır</div>
             <div style={subtitleStyle}>
@@ -206,7 +220,7 @@ export default function TablePremiumPage({ params }: { params: { table: string }
         >
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
-              <img src="/bill.png" alt="Hesap" style={imgStyle} />
+              <img src={`/bill.png?${v}`} alt="Hesap" style={imgStyleCover} />
             </div>
             <div style={titleStyle}>Hesap İste</div>
             <div style={subtitleStyle}>
@@ -215,11 +229,11 @@ export default function TablePremiumPage({ params }: { params: { table: string }
           </div>
         </button>
 
-        {/* Menü (SADECE 1 KEZ "Menü") */}
+        {/* Menü (TEK yazı: "Menü") */}
         <a href={`/t/${tableToken}/menu`} style={{ textDecoration: 'none' }}>
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
-              <img src="/menu.png" alt="Menü" style={imgStyle} />
+              <img src={`/menu.png?${v}`} alt="Menü" style={imgStyleContain} />
             </div>
             <div style={titleStyle}>Menü</div>
           </div>
