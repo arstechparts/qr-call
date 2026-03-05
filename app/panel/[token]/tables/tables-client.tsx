@@ -20,7 +20,9 @@ type TableRow = {
 
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://qr-call.vercel.app'
+    (process.env.NEXT_PUBLIC_APP_URL || 'https://qr-call.vercel.app').replace(/\/$/, '')
+
+  const token = (panelToken || '').trim()
 
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -37,11 +39,11 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setLoading(true)
     setError(null)
 
-    // 1) Restaurant'ı panel_token ile bul (EN KRİTİK FIX BURASI)
+    // Restaurant'ı panel_token ile bul
     const { data: r, error: rErr } = await supabase
       .from('restaurants')
       .select('id,name,panel_token')
-      .eq('panel_token', panelToken)
+      .eq('panel_token', token)
       .maybeSingle()
 
     if (rErr) {
@@ -62,7 +64,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
     setRestaurant(r)
 
-    // 2) Masaları restaurant_id ile çek
     const { data: t, error: tErr } = await supabase
       .from('restaurant_tables')
       .select('id,restaurant_id,table_number,table_token,is_active,created_at')
@@ -85,10 +86,9 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setAdding(true)
     setError(null)
 
-    // RPC: add_next_table_by_panel(p_panel_token text)
-    // Param adı p_panel_token OLMAK ZORUNDA (yoksa "without parameters" / schema cache hatası verir)
+    // ÖNEMLİ: param adı p_panel_token olmalı
     const { data, error: rpcErr } = await supabase.rpc('add_next_table_by_panel', {
-      p_panel_token: panelToken,
+      p_panel_token: token,
     })
 
     if (rpcErr) {
@@ -97,15 +97,13 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       return
     }
 
-    // Bazı RPC return formatları array döner
     const inserted = Array.isArray(data) ? data[0] : data
     if (inserted?.id) {
-      // hızlı ekle
       setTables((prev) => [
         ...prev,
         {
           id: inserted.id,
-          restaurant_id: restaurant?.id || inserted.restaurant_id,
+          restaurant_id: inserted.restaurant_id,
           table_number: Number(inserted.table_number),
           table_token: String(inserted.table_token),
           is_active: inserted.is_active ?? true,
@@ -113,7 +111,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         },
       ])
     } else {
-      // garanti: yeniden yükle
       await loadAll()
     }
 
@@ -125,7 +122,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   function qrImgUrl(tableToken: string) {
-    // dış servisle QR görseli (ek paket yok)
     const link = encodeURIComponent(qrLink(tableToken))
     return `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${link}`
   }
@@ -150,7 +146,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   useEffect(() => {
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelToken])
+  }, [token])
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
@@ -192,7 +188,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                 >
                   <div className="text-white">
                     <div className="text-lg font-semibold">Masa {t.table_number}</div>
-                    <div className="mt-1 text-xs text-white/50 break-all">{t.table_token}</div>
+                    <div className="mt-1 break-all text-xs text-white/50">{t.table_token}</div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
