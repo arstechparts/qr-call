@@ -1,47 +1,69 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 type TableRow = {
+  id: string
   table_number: number
   restaurant_id: string
   table_token: string
+  is_active: boolean
 }
 
-export default function Page() {
-  const params = useParams()
-  const incoming = String(params?.table ?? '')
+export default function TablePremiumPage({ params }: { params: { table: string } }) {
+  const tableToken = params.table
 
-  const [row, setRow] = useState<TableRow | null>(null)
   const [loading, setLoading] = useState(true)
+  const [invalid, setInvalid] = useState(false)
+  const [row, setRow] = useState<TableRow | null>(null)
+  const [sending, setSending] = useState<'waiter' | 'bill' | null>(null)
+
+  const bgStyle = useMemo(
+    () => ({
+      minHeight: '100vh',
+      padding: 16,
+      background:
+        'radial-gradient(1200px 700px at 50% 0%, rgba(255,255,255,0.10), rgba(0,0,0,0)),' +
+        'linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%)',
+      display: 'flex',
+      justifyContent: 'center',
+    }),
+    []
+  )
 
   useEffect(() => {
+    let alive = true
     ;(async () => {
       setLoading(true)
+      setInvalid(false)
 
-      // table_token ile bul (biz QR'ı bununla basıyoruz)
       const { data, error } = await supabase
         .from('restaurant_tables')
-        .select('table_number, restaurant_id, table_token')
-        .eq('table_token', incoming)
-        .eq('is_active', true)
+        .select('id, table_number, restaurant_id, table_token, is_active')
+        .eq('table_token', tableToken)
+        .limit(1)
         .maybeSingle()
 
-      if (error) {
-        setRow(null)
-        setLoading(false)
-        return
-      }
+      if (!alive) return
 
-      setRow((data as TableRow) ?? null)
+      if (error || !data || data.is_active === false) {
+        setInvalid(true)
+        setRow(null)
+      } else {
+        setRow(data as TableRow)
+      }
       setLoading(false)
     })()
-  }, [incoming])
 
-  async function send(type: 'waiter' | 'bill') {
+    return () => {
+      alive = false
+    }
+  }, [tableToken])
+
+  async function sendRequest(type: 'waiter' | 'bill') {
     if (!row) return
+    setSending(type)
 
     const { error } = await supabase.from('requests').insert({
       restaurant_id: row.restaurant_id,
@@ -50,41 +72,158 @@ export default function Page() {
       status: 'waiting',
     })
 
-    if (error) alert(error.message)
-    else alert('İstek gönderildi ✅')
+    setSending(null)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+    alert('Gönderildi ✅')
   }
 
-  if (loading) return <div style={{ padding: 18, color: 'white', background: '#070A12', minHeight: '100vh' }}>Yükleniyor...</div>
-
-  if (!row) {
+  if (loading) {
     return (
-      <div style={{ padding: 18, color: 'white', background: '#070A12', minHeight: '100vh' }}>
-        QR bulunamadı / geçersiz
+      <div style={bgStyle}>
+        <div style={{ width: '100%', maxWidth: 520, color: '#fff', opacity: 0.9 }}>
+          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Premium</div>
+          <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
+        </div>
       </div>
     )
   }
 
+  if (invalid || !row) {
+    return (
+      <div style={bgStyle}>
+        <div style={{ width: '100%', maxWidth: 520 }}>
+          <div
+            style={{
+              borderRadius: 24,
+              padding: 22,
+              color: '#fff',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+            }}
+          >
+            <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Premium</div>
+            <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
+            <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
+              Bu QR kapalı ya da bulunamadı.
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Kart ortak stili
+  const cardStyle: React.CSSProperties = {
+    borderRadius: 28,
+    padding: 18,
+    color: '#fff',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+  }
+
+  const actionCardStyle: React.CSSProperties = {
+    ...cardStyle,
+    padding: 22,
+  }
+
+  const imgWrapStyle: React.CSSProperties = {
+    width: '100%',
+    borderRadius: 22,
+    overflow: 'hidden',
+    background: 'transparent',
+  }
+
+  const imgStyle: React.CSSProperties = {
+    width: '100%',
+    height: 260,
+    objectFit: 'cover',
+    display: 'block',
+  }
+
+  const titleStyle: React.CSSProperties = {
+    marginTop: 14,
+    fontSize: 34,
+    fontWeight: 900,
+    letterSpacing: -0.6,
+    textAlign: 'center',
+  }
+
+  const subtitleStyle: React.CSSProperties = {
+    marginTop: 6,
+    fontSize: 18,
+    opacity: 0.8,
+    textAlign: 'center',
+  }
+
+  const buttonLikeStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    textAlign: 'left',
+    color: 'inherit',
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#070A12', padding: 14, color: 'white' }}>
-      <div style={{ maxWidth: 520, margin: '0 auto' }}>
-        <div style={{ borderRadius: 18, padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
-          <div style={{ fontSize: 13, opacity: 0.8 }}>CASITA PREMIUM v1</div>
-          <div style={{ fontSize: 30, fontWeight: 900 }}>Masa {row.table_number}</div>
+    <div style={bgStyle}>
+      <div style={{ width: '100%', maxWidth: 560, display: 'grid', gap: 16 }}>
+        {/* Üst başlık (daha küçük) */}
+        <div style={{ ...cardStyle, padding: 16 }}>
+          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 6 }}>Premium</div>
+          <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: -1 }}>
+            Masa {row.table_number}
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-          <button onClick={() => send('waiter')} style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontWeight: 900 }}>
-            Garson Çağır
-          </button>
+        {/* Garson Çağır */}
+        <button
+          style={buttonLikeStyle}
+          onClick={() => sendRequest('waiter')}
+          disabled={sending !== null}
+        >
+          <div style={actionCardStyle}>
+            <div style={imgWrapStyle}>
+              <img src="/waiter-v2.png" alt="Garson" style={imgStyle} />
+            </div>
+            <div style={titleStyle}>Garson Çağır</div>
+            <div style={subtitleStyle}>
+              {sending === 'waiter' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
+            </div>
+          </div>
+        </button>
 
-          <button onClick={() => send('bill')} style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontWeight: 900 }}>
-            Hesap İste
-          </button>
+        {/* Hesap İste */}
+        <button
+          style={buttonLikeStyle}
+          onClick={() => sendRequest('bill')}
+          disabled={sending !== null}
+        >
+          <div style={actionCardStyle}>
+            <div style={imgWrapStyle}>
+              <img src="/bill.png" alt="Hesap" style={imgStyle} />
+            </div>
+            <div style={titleStyle}>Hesap İste</div>
+            <div style={subtitleStyle}>
+              {sending === 'bill' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
+            </div>
+          </div>
+        </button>
 
-          <a href={`/t/${incoming}/menu`} style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontWeight: 900, textDecoration: 'none', textAlign: 'center' }}>
-            Menü
-          </a>
-        </div>
+        {/* Menü (SADECE 1 KEZ "Menü") */}
+        <a href={`/t/${tableToken}/menu`} style={{ textDecoration: 'none' }}>
+          <div style={actionCardStyle}>
+            <div style={imgWrapStyle}>
+              <img src="/menu.png" alt="Menü" style={imgStyle} />
+            </div>
+            <div style={titleStyle}>Menü</div>
+          </div>
+        </a>
       </div>
     </div>
   )
