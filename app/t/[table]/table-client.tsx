@@ -34,25 +34,43 @@ export default function TableClient({ incoming }: { incoming: string }) {
 
   useEffect(() => {
     let alive = true
+
     ;(async () => {
       setLoading(true)
       setInvalid(false)
+      setRow(null)
 
-      const { data, error } = await supabase
+      // ✅ 1) UUID kolonuna normal eq ile dene ama array al (daha stabil)
+      const r1 = await supabase
         .from('restaurant_tables')
         .select('id, table_number, restaurant_id, table_token, is_active')
-        .eq('table_token', tableToken as any) // uuid cast sorunu yaşamamak için
+        .eq('table_token', tableToken as any)
         .limit(1)
-        .maybeSingle()
+
+      let found = (r1.data && r1.data[0]) ? (r1.data[0] as any) : null
+      let err = r1.error
+
+      // ✅ 2) Eğer bulamadıysa token(text) kolonundan da dene (eski sistem fallback)
+      if (!found && !err) {
+        const r2 = await supabase
+          .from('restaurant_tables')
+          .select('id, table_number, restaurant_id, table_token, is_active')
+          .eq('token', tableToken)
+          .limit(1)
+
+        found = (r2.data && r2.data[0]) ? (r2.data[0] as any) : null
+        err = r2.error
+      }
 
       if (!alive) return
 
-      if (error || !data || data.is_active === false) {
+      if (err || !found || found.is_active === false) {
         setInvalid(true)
         setRow(null)
       } else {
-        setRow(data as TableRow)
+        setRow(found as TableRow)
       }
+
       setLoading(false)
     })()
 
@@ -111,6 +129,9 @@ export default function TableClient({ incoming }: { incoming: string }) {
             <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
               Bu QR kapalı ya da bulunamadı.
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.65 }}>
+              token: {tableToken}
             </div>
           </div>
         </div>
