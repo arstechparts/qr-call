@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 
-export default async function PanelTokenIndex({
+export default function PanelTokenIndex({
   params,
 }: {
-  params: Promise<{ token: string }>
+  params: { token: string }
 }) {
-  const { token } = await params
+  const { token } = params
+
   redirect(`/panel/${token}/requests`)
 }
