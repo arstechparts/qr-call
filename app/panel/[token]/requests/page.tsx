@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 type Restaurant = {
@@ -21,7 +22,6 @@ type RequestRow = {
 
 function formatTR(dateIso: string) {
   const d = new Date(dateIso)
-  // TR saat/tarih: 04.03.2026 22:37
   const parts = new Intl.DateTimeFormat('tr-TR', {
     timeZone: 'Europe/Istanbul',
     day: '2-digit',
@@ -43,14 +43,20 @@ function requestTypeLabel(t: string) {
   return t
 }
 
-function statusLabel(s: string) {
-  if (s === 'waiting') return 'Bekliyor'
-  if (s === 'completed') return 'Tamamlandı'
-  return s
-}
-
 export default function RequestsPage({ params }: { params: { token: string } }) {
-  const panelToken = params.token
+  const pathname = usePathname()
+
+  // ✅ Bazen Next route/params karışınca token boş geliyor.
+  // Bu yüzden URL’den de tokenı “fallback” alıyoruz.
+  const tokenFromUrl = useMemo(() => {
+    // /panel/<token>/requests
+    const parts = (pathname ?? '').split('/').filter(Boolean)
+    const i = parts.indexOf('panel')
+    if (i >= 0 && parts[i + 1]) return parts[i + 1]
+    return ''
+  }, [pathname])
+
+  const panelToken = (params?.token || tokenFromUrl || '').trim()
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [rows, setRows] = useState<RequestRow[]>([])
@@ -60,7 +66,7 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
   // Ses
   const [soundEnabled, setSoundEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const prevCountRef = useRef<number>(0)
+  const prevWaitingRef = useRef<number>(0)
 
   const pageStyle = useMemo(
     () => ({
@@ -82,9 +88,29 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
   }
 
-  async function loadRestaurantAndRequests() {
+  async function fetchRequests(restaurantId: string) {
+    const { data, error } = await supabase
+      .from('requests')
+      .select('id, restaurant_id, table_number, request_type, status, created_at')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (error) throw new Error(error.message)
+    return (data ?? []) as RequestRow[]
+  }
+
+  async function loadAll() {
     setLoading(true)
     setErrorMsg(null)
+
+    if (!panelToken) {
+      setRestaurant(null)
+      setRows([])
+      setLoading(false)
+      setErrorMsg('Panel token bulunamadı. Linki token ile aç: /panel/<token>/requests')
+      return
+    }
 
     const { data: r, error: rErr } = await supabase
       .from('restaurants')
@@ -96,40 +122,35 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
       setRestaurant(null)
       setRows([])
       setLoading(false)
-      setErrorMsg('Panel bulunamadı (restaurant yok).')
+      setErrorMsg(`Panel bulunamadı (restaurant yok). Token: ${panelToken}`)
       return
     }
 
-    setRestaurant(r as Restaurant)
+    const rest = r as Restaurant
+    setRestaurant(rest)
 
-    const { data: reqs, error: qErr } = await supabase
-      .from('requests')
-      .select('id, restaurant_id, table_number, request_type, status, created_at')
-      .eq('restaurant_id', r.id)
-      .order('created_at', { ascending: false })
-      .limit(200)
-
-    if (qErr) {
+    try {
+      const list = await fetchRequests(rest.id)
+      setRows(list)
+      prevWaitingRef.current = list.filter((x) => x.status === 'waiting').length
+    } catch (e: any) {
       setRows([])
-      setLoading(false)
-      setErrorMsg(qErr.message)
-      return
+      setErrorMsg(e?.message ?? 'Requests çekilemedi')
     }
 
-    const list = (reqs ?? []) as RequestRow[]
-    setRows(list)
-    prevCountRef.current = list.filter((x) => x.status === 'waiting').length
     setLoading(false)
   }
 
   useEffect(() => {
-    loadRestaurantAndRequests()
+    loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelToken])
 
-  // Realtime
+  // ✅ Realtime + ✅ 3sn polling fallback (realtime kapalı olsa bile düşer)
   useEffect(() => {
     if (!restaurant?.id) return
+
+    let alive = true
 
     const channel = supabase
       .channel(`requests-${restaurant.id}`)
@@ -137,33 +158,46 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
         'postgres_changes',
         { event: '*', schema: 'public', table: 'requests', filter: `restaurant_id=eq.${restaurant.id}` },
         async () => {
-          // değişiklik olunca tekrar çek
-          const { data: reqs } = await supabase
-            .from('requests')
-            .select('id, restaurant_id, table_number, request_type, status, created_at')
-            .eq('restaurant_id', restaurant.id)
-            .order('created_at', { ascending: false })
-            .limit(200)
-
-          const list = ((reqs ?? []) as RequestRow[]).slice()
+          if (!alive) return
+          const list = await fetchRequests(restaurant.id)
           setRows(list)
 
-          // yeni "waiting" geldiyse ding
           const waitingCount = list.filter((x) => x.status === 'waiting').length
-          if (soundEnabled && waitingCount > prevCountRef.current) {
+          if (soundEnabled && waitingCount > prevWaitingRef.current) {
             try {
-              audioRef.current?.currentTime && (audioRef.current.currentTime = 0)
-              await audioRef.current?.play()
-            } catch {
-              // iOS autoplay engeli olabilir; kullanıcı tekrar etkinleştirir
-            }
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0
+                await audioRef.current.play()
+              }
+            } catch {}
           }
-          prevCountRef.current = waitingCount
+          prevWaitingRef.current = waitingCount
         }
       )
       .subscribe()
 
+    const timer = setInterval(async () => {
+      if (!alive) return
+      try {
+        const list = await fetchRequests(restaurant.id)
+        setRows(list)
+
+        const waitingCount = list.filter((x) => x.status === 'waiting').length
+        if (soundEnabled && waitingCount > prevWaitingRef.current) {
+          try {
+            if (audioRef.current) {
+              audioRef.current.currentTime = 0
+              await audioRef.current.play()
+            }
+          } catch {}
+        }
+        prevWaitingRef.current = waitingCount
+      } catch {}
+    }, 3000)
+
     return () => {
+      alive = false
+      clearInterval(timer)
       supabase.removeChannel(channel)
     }
   }, [restaurant?.id, soundEnabled])
@@ -176,9 +210,9 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
       audioRef.current.pause()
       audioRef.current.currentTime = 0
       setSoundEnabled(true)
-      alert('Ses açıldı ✅ (Artık yeni istek gelince çalar)')
+      alert('Ses açıldı ✅')
     } catch {
-      alert('iPhone ses engeli: Lütfen tekrar dokunup deneyin.')
+      alert('iPhone ses engeli: tekrar dokunup deneyin.')
     }
   }
 
@@ -188,18 +222,18 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
   }
 
   const waiting = rows.filter((r) => r.status === 'waiting')
-  const completed = rows.filter((r) => r.status !== 'waiting')
+  const history = rows.filter((r) => r.status !== 'waiting')
 
   return (
     <div style={pageStyle}>
-      {/* Ses dosyası */}
       <audio ref={audioRef} src="/ding.wav" preload="auto" />
 
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 12 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ opacity: 0.75, fontSize: 13 }}>Panel</div>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>
+            <div style={{ opacity: 0.75, fontSize: 13 }}>Panel Token</div>
+            <div style={{ fontSize: 14, fontWeight: 800, opacity: 0.9 }}>{panelToken || '(boş)'}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6 }}>
               {restaurant ? restaurant.name : 'Yükleniyor…'}
             </div>
           </div>
@@ -221,7 +255,7 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
             </button>
 
             <button
-              onClick={loadRestaurantAndRequests}
+              onClick={loadAll}
               style={{
                 height: 40,
                 padding: '0 12px',
@@ -245,6 +279,7 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
               background: 'rgba(255, 0, 0, 0.10)',
               border: '1px solid rgba(255, 0, 0, 0.20)',
               color: '#ffd6d6',
+              whiteSpace: 'pre-wrap',
             }}
           >
             {errorMsg}
@@ -252,7 +287,10 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
         )}
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href={`/panel/${panelToken}/tables`} style={{ color: '#fff', textDecoration: 'none' }}>
+          <Link
+            href={panelToken ? `/panel/${panelToken}/tables` : '/panel'}
+            style={{ color: '#fff', textDecoration: 'none' }}
+          >
             ← Masalar
           </Link>
         </div>
@@ -261,7 +299,6 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
           <div style={cardStyle}>Yükleniyor…</div>
         ) : (
           <>
-            {/* Bekleyenler */}
             <div style={{ ...cardStyle, padding: 14 }}>
               <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
                 Bekleyen İstekler ({waiting.length})
@@ -290,11 +327,10 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
                           Masa {r.table_number} · {requestTypeLabel(r.request_type)}
                         </div>
                         <div style={{ opacity: 0.75, marginTop: 4 }}>
-                          {statusLabel(r.status)} · {formatTR(r.created_at)}
+                          {formatTR(r.created_at)}
                         </div>
                       </div>
 
-                      {/* ✅ BURASI DÜZGÜN BUTTON (build kırılmaz) */}
                       <button
                         onClick={() => complete(r.id)}
                         style={{
@@ -304,7 +340,6 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
                           background: 'rgba(255,255,255,0.08)',
                           color: '#fff',
                           height: 42,
-                          alignSelf: 'center',
                           fontWeight: 800,
                         }}
                       >
@@ -316,17 +351,16 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
               )}
             </div>
 
-            {/* Tamamlananlar */}
             <div style={{ ...cardStyle, padding: 14 }}>
               <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
-                Geçmiş ({completed.length})
+                Geçmiş ({history.length})
               </div>
 
-              {completed.length === 0 ? (
+              {history.length === 0 ? (
                 <div style={{ opacity: 0.75 }}>Henüz geçmiş yok.</div>
               ) : (
                 <div style={{ display: 'grid', gap: 10 }}>
-                  {completed.slice(0, 50).map((r) => (
+                  {history.slice(0, 50).map((r) => (
                     <div
                       key={r.id}
                       style={{
@@ -340,7 +374,7 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
                         Masa {r.table_number} · {requestTypeLabel(r.request_type)}
                       </div>
                       <div style={{ opacity: 0.7, marginTop: 4 }}>
-                        {statusLabel(r.status)} · {formatTR(r.created_at)}
+                        {formatTR(r.created_at)}
                       </div>
                     </div>
                   ))}
