@@ -24,6 +24,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   const RANGE_MIN = 1
   const RANGE_MAX = 34
 
+  const token = (panelToken || '').trim()
+
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,10 +58,17 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setLoading(true)
     setError(null)
 
+    if (!token) {
+      setRestaurant(null)
+      setTables([])
+      setLoading(false)
+      return
+    }
+
     const { data: r, error: rErr } = await supabase
       .from('restaurants')
       .select('id,name,panel_token')
-      .eq('panel_token', panelToken)
+      .eq('panel_token', token) // ✅ trim’lenmiş token ile eşleştir
       .maybeSingle()
 
     if (rErr) {
@@ -73,7 +82,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     if (!r) {
       setRestaurant(null)
       setTables([])
-      setError(null)
       setLoading(false)
       return
     }
@@ -83,7 +91,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     const { data: t, error: tErr } = await supabase
       .from('restaurant_tables')
       .select('id,restaurant_id,table_number,table_token,is_active')
-      .eq('restaurant_id', r.id)
+      .eq('restaurant_id', (r as RestaurantRow).id)
       .order('table_number', { ascending: true })
 
     if (tErr) {
@@ -100,10 +108,10 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   useEffect(() => {
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelToken])
+  }, [token])
 
-  function openQrModal(tableNumber: number, token: string) {
-    const link = `${APP_URL}/t/${token}`
+  function openQrModal(tableNumber: number, tableToken: string) {
+    const link = `${APP_URL}/t/${tableToken}`
     const img = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
       link
     )}`
@@ -175,16 +183,14 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   async function createNextMissing() {
-    if (!restaurant) return
     const next = missingNumbers[0]
     if (!next) return
     await createTable(next)
   }
 
-  const canUse = !loading && !!restaurant
+  const canUse = !loading && !!restaurant && !working
 
   return (
-    // ✅ KENDİ ARKA PLANIMIZI BURADA VERİYORUZ (layout bozulsa bile görünür)
     <div className="min-h-[70vh] w-full">
       <div
         className="w-full rounded-[32px] p-4 md:p-6"
@@ -194,7 +200,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           border: '1px solid rgba(255,255,255,0.10)',
         }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <div className="text-2xl font-bold text-white">Masalar</div>
@@ -203,36 +208,27 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
           <button
             onClick={createNextMissing}
-            disabled={!canUse || working || missingNumbers.length === 0}
+            disabled={!canUse || missingNumbers.length === 0}
             className={`px-4 py-3 rounded-2xl font-semibold transition
               ${
-                !canUse || working || missingNumbers.length === 0
+                !canUse || missingNumbers.length === 0
                   ? 'bg-white/10 text-white/40'
                   : 'bg-white/15 text-white hover:bg-white/20'
               }`}
           >
-            Masa Ekle (1-{RANGE_MAX})
+            Masa Ekle (1-34)
           </button>
         </div>
 
-        {/* Hata */}
         {error ? (
           <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 text-red-100 px-4 py-3">
             {error}
           </div>
         ) : null}
 
-        {/* Restaurant yoksa (kırmızı değil) */}
-        {!restaurant && !loading ? (
-          <div className="rounded-2xl bg-white/10 text-white/80 px-4 py-4">
-            Panel token ile restoran eşleşmedi.
-            <div className="text-white/60 text-sm mt-1">
-              Supabase → <b>restaurants</b> tablosunda <b>panel_token</b> dolu olmalı.
-            </div>
-          </div>
-        ) : null}
+        {/* ✅ “Restoran bulunamadı” yazısını ekrandan KALDIRDIK.
+            Restoran yoksa sadece butonlar pasif kalır. */}
 
-        {/* Liste */}
         <div className="mt-4 rounded-3xl bg-white/10 border border-white/10 overflow-hidden">
           {loading ? (
             <div className="px-4 py-6 text-white/70">Yükleniyor...</div>
@@ -264,10 +260,10 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                       ) : (
                         <button
                           onClick={() => createTable(n)}
-                          disabled={!canUse || working}
+                          disabled={!canUse}
                           className={`px-3 py-2 rounded-xl font-semibold transition
                             ${
-                              !canUse || working
+                              !canUse
                                 ? 'bg-white/10 text-white/40'
                                 : 'bg-white/15 text-white hover:bg-white/20'
                             }`}
@@ -284,7 +280,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         </div>
       </div>
 
-      {/* QR Modal */}
       {qrOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-4"
@@ -293,10 +288,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         >
           <div
             className="w-full max-w-sm rounded-3xl p-4"
-            style={{
-              background: '#0b1220',
-              border: '1px solid rgba(255,255,255,0.10)',
-            }}
+            style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
