@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 type Restaurant = { id: string; name: string; panel_token: string }
@@ -14,9 +14,26 @@ type ReqRow = {
   created_at: string
 }
 
-function trTime(iso: string) {
-  // Türkiye saati
-  return new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })
+function trDateTime(iso: string) {
+  try {
+    return new Intl.DateTimeFormat('tr-TR', {
+      timeZone: 'Europe/Istanbul',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
+}
+
+function typeLabel(t: string) {
+  if (t === 'waiter') return 'Garson'
+  if (t === 'bill') return 'Hesap'
+  if (t === 'menu') return 'Menü'
+  return t
 }
 
 export default function RequestsPage({ params }: { params: { token: string } }) {
@@ -30,6 +47,17 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
   const [soundEnabled, setSoundEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  const wrap = useMemo(
+    () => ({
+      minHeight: '100vh',
+      padding: 16,
+      background: '#0b1220',
+      color: '#fff',
+    }),
+    []
+  )
+
+  // ding.wav public'de olmalı
   useEffect(() => {
     audioRef.current = new Audio('/ding.wav')
     audioRef.current.preload = 'auto'
@@ -38,12 +66,30 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
   async function playDing() {
     try {
       if (!soundEnabled) return
-      await audioRef.current?.play()
+      if (!audioRef.current) return
+      audioRef.current.currentTime = 0
+      await audioRef.current.play()
     } catch {
-      // iOS bazen engeller, sorun değil
+      // iOS bazen engeller (kullanıcı Sesi Aç'a basmadan)
     }
   }
 
+  async function loadRequests(rid: string) {
+    const { data, error } = await supabase
+      .from('requests')
+      .select('id, restaurant_id, table_number, request_type, status, created_at')
+      .eq('restaurant_id', rid)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (error) {
+      setErr(error.message)
+      return
+    }
+    setRows((data || []) as ReqRow[])
+  }
+
+  // 1) Restaurant'ı panel_token ile bul
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -54,6 +100,7 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
         .from('restaurants')
         .select('id, name, panel_token')
         .eq('panel_token', panelToken)
+        .limit(1)
         .maybeSingle()
 
       if (!alive) return
@@ -67,107 +114,60 @@ export default function RequestsPage({ params }: { params: { token: string } }) 
       }
 
       setRestaurant(r as Restaurant)
-
-      const { data: reqs, error: qErr } = await supabase
-        .from('requests')
-        .select('id, restaurant_id, table_number, request_type, status, created_at')
-        .eq('restaurant_id', r.id)
-        .order('created_at', { ascending: false })
-
-      if (!alive) return
-
-      if (qErr) setErr(qErr.message)
-      setRows((reqs || []) as ReqRow[])
+      await loadRequests(r.id)
       setLoading(false)
-
-      // realtime
-      const channel = supabase
-        .channel(`requests-${r.id}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'requests', filter: `restaurant_id=eq.${r.id}` },
-          async () => {
-            const { data: fresh } = await supabase
-              .from('requests')
-              .select('id, restaurant_id, table_number, request_type, status, created_at')
-              .eq('restaurant_id', r.id)
-              .order('created_at', { ascending: false })
-
-            if (!alive) return
-            setRows((fresh || []) as ReqRow[])
-            await playDing()
-          }
-        )
-        .subscribe()
-
-      return () => {
-        supabase.removeChannel(channel)
-      }
     })()
 
     return () => {
       alive = false
     }
-  }, [panelToken, soundEnabled])
+  }, [panelToken])
+
+  // 2) Realtime subscribe (anlık düşsün + ses çalsın)
+  useEffect(() => {
+    if (!restaurant?.id) return
+    let alive = true
+
+    const rid = restaurant.id
+
+    const channel = supabase
+      .channel(`requests-live-${rid}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'requests', filter: `restaurant_id=eq.${rid}` },
+        async () => {
+          if (!alive) return
+          await loadRequests(rid)
+          await playDing()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      alive = false
+      supabase.removeChannel(channel)
+    }
+    // soundEnabled değişince subscribe resetlemiyoruz, playDing zaten kontrol ediyor
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id, soundEnabled])
 
   async function complete(id: string) {
     const { error } = await supabase.from('requests').update({ status: 'done' }).eq('id', id)
     if (error) alert(error.message)
+    if (restaurant?.id) await loadRequests(restaurant.id)
   }
 
-  if (loading) return <div>Yükleniyor…</div>
+  if (loading) return <div style={wrap}>Yükleniyor…</div>
 
   return (
-    <div>
-      <h2 style={{ margin: '6px 0 6px' }}>İstekler {restaurant ? `- ${restaurant.name}` : ''}</h2>
+    <div style={wrap}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+        <a href={`/panel/${panelToken}`} style={{ color: '#9bdcff' }}>
+          Panel
+        </a>
+        <a href={`/panel/${panelToken}/tables`} style={{ color: '#9bdcff' }}>
+          Masalar
+        </a>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <button
-          onClick={async () => {
-            setSoundEnabled(true)
-            try {
-              await audioRef.current?.play()
-              audioRef.current?.pause()
-              if (audioRef.current) audioRef.current.currentTime = 0
-            } catch {}
-          }}
-        >
-          Sesi Aç
-        </button>
-
-        <a href={`/panel/${panelToken}/tables`}>Masalar</a>
-      </div>
-
-      {err && (
-        <div style={{ background: '#ffe6e6', border: '1px solid #ffb3b3', padding: 10, borderRadius: 8 }}>
-          {err}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-        {rows.map((r) => (
-          <div
-            key={r.id}
-            style={{
-              border: '1px solid #e5e5e5',
-              borderRadius: 10,
-              padding: 12,
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 800 }}>Masa {r.table_number}</div>
-              <div>Tip: {r.request_type}</div>
-              <div>Durum: {r.status}</div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>{trTime(r.created_at)}</div>
-            </div>
-
-            <button onClick={() => complete(r.id)}>Tamamlandı</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+          onClick
