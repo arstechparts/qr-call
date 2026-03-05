@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
-type Restaurant = {
+type RestaurantRow = {
   id: string
   name: string
   panel_token: string
@@ -15,6 +15,7 @@ type TableRow = {
   table_number: number
   table_token: string
   is_active: boolean
+  created_at?: string
 }
 
 export default function PanelTablesPage({ params }: { params: { token: string } }) {
@@ -22,7 +23,7 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
 
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
+  const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
   const [adding, setAdding] = useState(false)
 
@@ -62,16 +63,16 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
     if (rErr || !r) {
       setRestaurant(null)
       setTables([])
-      setErr('Panel bulunamadı (restaurant yok).')
+      setErr('Restaurant bulunamadı (panel token yanlış olabilir).')
       setLoading(false)
       return
     }
 
-    setRestaurant(r as Restaurant)
+    setRestaurant(r as RestaurantRow)
 
     const { data: t, error: tErr } = await supabase
       .from('restaurant_tables')
-      .select('id, restaurant_id, table_number, table_token, is_active')
+      .select('id, restaurant_id, table_number, table_token, is_active, created_at')
       .eq('restaurant_id', r.id)
       .order('table_number', { ascending: true })
 
@@ -95,8 +96,9 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
     setAdding(true)
     setErr(null)
 
-    // ✅ otomatik max+1 masa ekler
-    const { data, error } = await supabase.rpc('add_next_table_by_panel', {
+    // ✅ SQL'de çalışan fonksiyonun parametreli hali:
+    // add_next_table_by_panel(p_panel_token text)
+    const { error } = await supabase.rpc('add_next_table_by_panel', {
       p_panel_token: panelToken,
     })
 
@@ -107,7 +109,6 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
       return
     }
 
-    // listeyi güncelle
     await loadAll()
   }
 
@@ -120,7 +121,7 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
     return (
       <div style={wrapStyle}>
         <div style={cardStyle}>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>Masalar</div>
+          <div style={{ fontSize: 18, fontWeight: 900 }}>Masalar</div>
           <div style={{ opacity: 0.8, marginTop: 8 }}>Yükleniyor…</div>
         </div>
       </div>
@@ -129,13 +130,19 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
 
   return (
     <div style={wrapStyle}>
-      <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 12 }}>
-        <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 12 }}>
+        <div
+          style={{
+            ...cardStyle,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>Masalar</div>
-            {restaurant ? (
-              <div style={{ opacity: 0.8, marginTop: 6 }}>{restaurant.name}</div>
-            ) : null}
+            <div style={{ fontSize: 20, fontWeight: 900 }}>Masalar</div>
+            {restaurant ? <div style={{ opacity: 0.75, marginTop: 6 }}>{restaurant.name}</div> : null}
           </div>
 
           <button
@@ -147,15 +154,22 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
               border: '1px solid rgba(255,255,255,0.18)',
               background: 'rgba(255,255,255,0.10)',
               color: '#fff',
-              fontWeight: 800,
+              fontWeight: 900,
+              whiteSpace: 'nowrap',
             }}
           >
-            {adding ? 'Ekleniyor…' : 'Sıradaki Masayı Ekle'}
+            {adding ? 'Ekleniyor…' : 'Masa Ekle (+1)'}
           </button>
         </div>
 
         {err ? (
-          <div style={{ ...cardStyle, border: '1px solid rgba(255,0,0,0.35)', background: 'rgba(255,0,0,0.10)' }}>
+          <div
+            style={{
+              ...cardStyle,
+              border: '1px solid rgba(255,0,0,0.35)',
+              background: 'rgba(255,0,0,0.10)',
+            }}
+          >
             {err}
           </div>
         ) : null}
@@ -165,38 +179,63 @@ export default function PanelTablesPage({ params }: { params: { token: string } 
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
             {tables.map((t) => {
-              const url = `${baseUrl}/t/${t.table_token}`
-              return (
-                <div key={t.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ fontWeight: 900, fontSize: 18 }}>Masa {t.table_number}</div>
+              const customerUrl = `${baseUrl}/t/${t.table_token}`
+              const qrPageUrl = `${baseUrl}/panel/tables/${t.id}`
 
-                  <div style={{ display: 'flex', gap: 10 }}>
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    ...cardStyle,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 18, fontWeight: 900 }}>Masa {t.table_number}</div>
+
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => window.open(url, '_blank')}
+                      onClick={() => window.open(qrPageUrl, '_blank')}
                       style={{
                         padding: '10px 12px',
                         borderRadius: 12,
                         border: '1px solid rgba(255,255,255,0.18)',
                         background: 'rgba(255,255,255,0.08)',
                         color: '#fff',
-                        fontWeight: 800,
+                        fontWeight: 900,
                       }}
                     >
-                      QR Link
+                      QR Gör / İndir
                     </button>
 
                     <button
-                      onClick={() => copyLink(url)}
+                      onClick={() => window.open(customerUrl, '_blank')}
                       style={{
                         padding: '10px 12px',
                         borderRadius: 12,
                         border: '1px solid rgba(255,255,255,0.18)',
                         background: 'rgba(255,255,255,0.08)',
                         color: '#fff',
-                        fontWeight: 800,
+                        fontWeight: 900,
                       }}
                     >
-                      Kopyala
+                      Müşteri Sayfası
+                    </button>
+
+                    <button
+                      onClick={() => copyLink(customerUrl)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.18)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        fontWeight: 900,
+                      }}
+                    >
+                      Link Kopyala
                     </button>
                   </div>
                 </div>
