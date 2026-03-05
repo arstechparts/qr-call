@@ -72,9 +72,9 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     }
 
     if (!r) {
+      // Restaurant yoksa ekranda gereksiz kırmızı hata basmayacağız.
       setRestaurant(null)
       setTables([])
-      // Bu mesajı ekranda göstermiyoruz (kafanı karıştırmasın), sadece butonu kilitleyeceğiz.
       setError(null)
       setLoading(false)
       return
@@ -130,17 +130,18 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       a.remove()
       URL.revokeObjectURL(url)
     } catch {
-      // iOS bazen indir yerine yeni sekmede açıyor, sorun değil:
+      // iOS bazen indir yerine yeni sekmede açıyor
       window.open(qrImg, '_blank')
     }
   }
 
   function newUuid(): string {
-    // Browser UUID (DB extension derdi yok)
+    // DB extension istemiyoruz; tarayıcıdan UUID üret.
     // @ts-ignore
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-    // Fallback
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random()
+      .toString(16)
+      .slice(2)}`
   }
 
   async function createTable(tableNumber: number) {
@@ -193,9 +194,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
           <div className="text-2xl font-bold text-white/90">Masalar</div>
-          <div className="text-white/50 text-sm">
-            {restaurant ? `${restaurant.name}` : '—'}
-          </div>
+          <div className="text-white/50 text-sm">{restaurant ? restaurant.name : '—'}</div>
         </div>
 
         <button
@@ -212,20 +211,120 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         </button>
       </div>
 
-      {/* Error: sadece gerçek sistem hataları */}
+      {/* Gerçek sistem hataları */}
       {error ? (
         <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 text-red-100 px-4 py-3">
           {error}
         </div>
       ) : null}
 
-      {/* Eğer restaurant yoksa: butonlar kilitli, ama hata yazdırmıyoruz */}
+      {/* Restaurant yoksa bilgilendirme (kırmızı değil) */}
       {!restaurant && !loading ? (
         <div className="rounded-2xl bg-white/10 text-white/70 px-4 py-4">
-          Panel token ile restoran eşleşmedi. (restaurants.tablosunda <b>panel_token</b> dolu
-          olmalı)
+          Panel token ile restoran eşleşmedi. <br />
+          <span className="text-white/60 text-sm">
+            (Supabase → <b>restaurants</b> tablosunda <b>panel_token</b> dolu olmalı)
+          </span>
         </div>
       ) : null}
 
-      {/* List */}
-      <div className
+      {/* Liste */}
+      <div className="rounded-3xl bg-white/10 border border-white/10 overflow-hidden">
+        {loading ? (
+          <div className="px-4 py-6 text-white/70">Yükleniyor...</div>
+        ) : (
+          <div>
+            {numbers.map((n) => {
+              const t = tableByNumber.get(n)
+
+              return (
+                <div
+                  key={n}
+                  className="flex items-center justify-between gap-3 px-4 py-4 border-b border-white/10"
+                >
+                  <div className="flex flex-col">
+                    <div className="text-white font-semibold text-lg">Masa {n}</div>
+                    <div className="text-white/50 text-sm">
+                      {t ? 'Oluşturuldu' : 'Henüz oluşturulmadı'}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {t ? (
+                      <button
+                        onClick={() => openQrModal(n, t.table_token)}
+                        className="px-3 py-2 rounded-xl bg-white/15 text-white font-semibold hover:bg-white/20"
+                      >
+                        QR Görüntüle
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => createTable(n)}
+                        disabled={!canUse || working}
+                        className={`px-3 py-2 rounded-xl font-semibold transition
+                          ${
+                            !canUse || working
+                              ? 'bg-white/10 text-white/40'
+                              : 'bg-white/15 text-white hover:bg-white/20'
+                          }`}
+                      >
+                        Oluştur
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* QR Modal */}
+      {qrOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+          onClick={() => setQrOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl bg-[#0b1220] border border-white/10 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-white font-bold text-lg">{qrTitle}</div>
+              <button
+                className="text-white/70 hover:text-white px-2"
+                onClick={() => setQrOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-white p-3 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrImg} alt="QR" className="w-full h-auto" />
+            </div>
+
+            <div className="mt-3 text-white/70 text-xs break-all">{qrLink}</div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={downloadQr}
+                className="flex-1 px-3 py-3 rounded-2xl bg-white/15 text-white font-semibold hover:bg-white/20"
+              >
+                QR İndir
+              </button>
+
+              <button
+                onClick={() => window.open(qrLink, '_blank')}
+                className="flex-1 px-3 py-3 rounded-2xl bg-white/15 text-white font-semibold hover:bg-white/20"
+              >
+                Link Aç
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
