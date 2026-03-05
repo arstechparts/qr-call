@@ -20,7 +20,7 @@ type TableRow = {
 
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const [loading, setLoading] = useState(true)
-  const [adding, setAdding] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
@@ -31,88 +31,89 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   const [qrTitle, setQrTitle] = useState('')
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://qr-call.vercel.app'
+    (process.env.NEXT_PUBLIC_APP_URL || 'https://qr-call.vercel.app').replace(/\/$/, '')
 
-  const sortedTables = useMemo(() => {
-    return [...tables].sort((a, b) => a.table_number - b.table_number)
+  const tablesByNumber = useMemo(() => {
+    const m = new Map<number, TableRow>()
+    for (const t of tables) m.set(t.table_number, t)
+    return m
   }, [tables])
 
-  async function loadAll() {
-    setLoading(true)
-    setError(null) // ✅ eski hatayı temizle
+  const viewRows = useMemo(() => {
+    const arr: { n: number; t?: TableRow }[] = []
+    for (let i = 1; i <= 34; i++) arr.push({ n: i, t: tablesByNumber.get(i) })
+    return arr
+  }, [tablesByNumber])
 
-    const { data: r, error: rErr } = await supabase
+  async function loadRestaurant() {
+    const { data, error: rErr } = await supabase
       .from('restaurants')
       .select('id,name,panel_token')
       .eq('panel_token', panelToken)
       .maybeSingle()
 
-    if (rErr) {
-      setRestaurant(null)
-      setTables([])
-      setError(rErr.message)
-      setLoading(false)
-      return
-    }
+    if (rErr) throw new Error(rErr.message)
+    if (!data) throw new Error('Restaurant bulunamadı (panel token yanlış olabilir).')
 
-    if (!r) {
-      setRestaurant(null)
-      setTables([])
-      setError('Restaurant bulunamadı (panel token yanlış olabilir).')
-      setLoading(false)
-      return
-    }
+    setRestaurant(data as RestaurantRow)
+    return data as RestaurantRow
+  }
 
-    setRestaurant(r as RestaurantRow)
-    setError(null) // ✅ restaurant bulunduysa hata YOK
-
-    const { data: t, error: tErr } = await supabase
+  async function loadTables(restaurantId: string) {
+    const { data, error: tErr } = await supabase
       .from('restaurant_tables')
       .select('id,restaurant_id,table_number,table_token,is_active,created_at')
-      .eq('restaurant_id', r.id)
+      .eq('restaurant_id', restaurantId)
       .order('table_number', { ascending: true })
 
-    if (tErr) {
-      setTables([])
-      setError(tErr.message)
-      setLoading(false)
-      return
-    }
+    if (tErr) throw new Error(tErr.message)
+    setTables((data || []) as TableRow[])
+  }
 
-    setTables((t || []) as TableRow[])
-    setLoading(false)
+  async function init() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const r = await loadRestaurant()
+      await loadTables(r.id)
+
+      // Restaurant bulunduysa hata mesajını temizle
+      setError(null)
+    } catch (e: any) {
+      setRestaurant(null)
+      setTables([])
+      setError(e?.message || 'Bir hata oluştu.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    loadAll()
+    init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelToken])
 
-  async function addNextTable() {
-    setAdding(true)
-    setError(null) // ✅ butona basınca da hatayı temizle
+  // ✅ Tek tuş: 1..34 masaları (eksikse) oluşturur ve listeyi döner
+  async function createTables1to34() {
+    setCreating(true)
+    setError(null)
 
-    const { data, error: rpcErr } = await supabase.rpc('add_next_table_by_panel', {
+    // Bu RPC, Supabase SQL'de oluşturduğumuz fonksiyon:
+    // public.ensure_tables_1_34_by_panel(p_panel_token text)
+    const { data, error: rpcErr } = await supabase.rpc('ensure_tables_1_34_by_panel', {
       p_panel_token: panelToken,
     })
 
     if (rpcErr) {
       setError(rpcErr.message)
-      setAdding(false)
+      setCreating(false)
       return
     }
 
-    // ✅ RPC başarılıysa “restaurant bulunamadı” gibi eski hataları asla gösterme
+    setTables((data || []) as TableRow[])
     setError(null)
-
-    const row = data as TableRow
-    setTables((prev) => {
-      const next = [row, ...prev]
-      next.sort((a, b) => a.table_number - b.table_number)
-      return next
-    })
-
-    setAdding(false)
+    setCreating(false)
   }
 
   function openQrForTable(t: TableRow) {
@@ -126,7 +127,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     const pngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(
       qrUrl
     )}`
-
     const a = document.createElement('a')
     a.href = pngUrl
     a.download = `${qrTitle.replace(/\s+/g, '_')}_qr.png`
@@ -141,21 +141,19 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-3xl font-bold text-white">Masalar</div>
-            {restaurant ? (
-              <div className="text-white/70 mt-1">{restaurant.name}</div>
-            ) : (
-              <div className="text-white/50 mt-1">{loading ? 'Yükleniyor…' : '—'}</div>
-            )}
+            <div className="text-white/70 mt-1">
+              {restaurant?.name || (loading ? 'Yükleniyor…' : '')}
+            </div>
           </div>
 
           <button
-            onClick={addNextTable}
-            disabled={adding}
+            onClick={createTables1to34}
+            disabled={creating}
             className={`px-5 py-3 rounded-2xl font-semibold text-white transition
-              ${adding ? 'bg-white/10 opacity-60' : 'bg-white/10 hover:bg-white/15'}
+              ${creating ? 'bg-white/10 opacity-60' : 'bg-white/10 hover:bg-white/15'}
             `}
           >
-            {adding ? 'Ekleniyor…' : 'Masa Ekle (+1)'}
+            {creating ? 'Oluşturuluyor…' : 'Masa Ekle (1-34)'}
           </button>
         </div>
 
@@ -168,20 +166,24 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         <div className="mt-5 rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
           {loading ? (
             <div className="p-4 text-white/70">Yükleniyor…</div>
-          ) : sortedTables.length === 0 ? (
-            <div className="p-4 text-white/70">Henüz masa yok.</div>
           ) : (
             <div className="divide-y divide-white/10">
-              {sortedTables.map((t) => (
-                <div key={t.id} className="p-4 flex items-center justify-between gap-3">
-                  <div className="text-white font-semibold">Masa {t.table_number}</div>
+              {viewRows.map(({ n, t }) => (
+                <div key={n} className="p-4 flex items-center justify-between gap-3">
+                  <div className="text-white font-semibold">Masa {n}</div>
 
-                  <button
-                    onClick={() => openQrForTable(t)}
-                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold"
-                  >
-                    QR Görüntüle
-                  </button>
+                  {t ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openQrForTable(t)}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold"
+                      >
+                        QR Görüntüle
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-white/50 text-sm">Henüz oluşturulmadı</div>
+                  )}
                 </div>
               ))}
             </div>
