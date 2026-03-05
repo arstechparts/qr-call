@@ -13,7 +13,7 @@ type TableRow = {
   id: string
   restaurant_id: string
   table_number: number
-  table_token: string // uuid -> string gelir
+  table_token: string
   is_active: boolean
 }
 
@@ -50,14 +50,14 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setLoading(true)
     setErr(null)
 
-    // 1) Restoranı PANEL TOKEN ile bul
-    const { data: r, error: re } = await supabase
-      .from('restaurants')
-      .select('id, name, panel_token')
-      .eq('panel_token', panelToken)
-      .maybeSingle()
+    // ✅ RESTAURANT: SELECT değil, RPC (RLS takılmaz)
+    const { data: r, error: re } = await supabase.rpc('get_restaurant_by_panel_token', {
+      p_panel_token: panelToken,
+    })
 
-    if (re || !r) {
+    const rr = Array.isArray(r) ? r[0] : null
+
+    if (re || !rr) {
       setRestaurant(null)
       setTables([])
       setErr('Restaurant bulunamadı (panel token yanlış olabilir).')
@@ -65,20 +65,18 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       return
     }
 
-    setRestaurant(r as RestaurantRow)
+    setRestaurant(rr as RestaurantRow)
 
-    // 2) Masaları getir
-    const { data: t, error: te } = await supabase
-      .from('restaurant_tables')
-      .select('id, restaurant_id, table_number, table_token, is_active')
-      .eq('restaurant_id', r.id)
-      .order('table_number', { ascending: true })
+    // ✅ TABLES: SELECT değil, RPC (RLS takılmaz)
+    const { data: t, error: te } = await supabase.rpc('list_tables_by_panel', {
+      p_panel_token: panelToken,
+    })
 
     if (te) {
       setTables([])
       setErr(te.message)
     } else {
-      setTables((t || []) as TableRow[])
+      setTables(((t as any[]) || []) as TableRow[])
     }
 
     setLoading(false)
@@ -94,8 +92,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setAdding(true)
     setErr(null)
 
-    // RPC param adı: p_panel_token (SQL'de böyle)
-    const { data, error } = await supabase.rpc('add_next_table_by_panel', {
+    const { error } = await supabase.rpc('add_next_table_by_panel', {
       p_panel_token: panelToken,
     })
 
@@ -105,7 +102,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       return
     }
 
-    // yeni masa eklendi -> listeyi yenile
     await load()
     setAdding(false)
   }
