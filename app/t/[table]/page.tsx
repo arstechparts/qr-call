@@ -1,5 +1,10 @@
 import TableClient from './table-client'
 
-export default function Page({ params }: { params: { table: string } }) {
-  return <TableClient incoming={params.table} />
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ table: string }>
+}) {
+  const { table } = await params
+  return <TableClient incoming={table} />
 }
