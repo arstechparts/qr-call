@@ -18,10 +18,6 @@ type TableRow = {
   created_at?: string
 }
 
-function cx(...arr: Array<string | false | null | undefined>) {
-  return arr.filter(Boolean).join(' ')
-}
-
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [tables, setTables] = useState<TableRow[]>([])
@@ -30,6 +26,11 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   const [working, setWorking] = useState<boolean>(false)
 
   const tokenSafe = panelToken?.trim() || ''
+
+  // ✅ Token’ı sakla (menü token’sız sayfaya düşerse geri yönlendirmek için)
+  useEffect(() => {
+    if (tokenSafe) localStorage.setItem('last_panel_token', tokenSafe)
+  }, [tokenSafe])
 
   // 1..34 sabit liste
   const allNumbers = useMemo(() => Array.from({ length: 34 }, (_, i) => i + 1), [])
@@ -52,7 +53,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         return
       }
 
-      // Restaurantı bul
+      // Restaurant bul
       const r = await supabase
         .from('restaurants')
         .select('id,name,panel_token')
@@ -92,33 +93,23 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenSafe])
 
-  // Masa oluştur (tek)
+  // Tek masa oluştur
   async function createTable(tableNumber: number) {
     if (!restaurant) return
+
     setWorking(true)
     setError('')
 
     try {
-      // Aynı masa varsa tekrar oluşturma
-      const exist = tableByNumber.get(tableNumber)
-      if (exist) return
+      if (tableByNumber.get(tableNumber)) return
 
-      const { data, error } = await supabase.rpc('add_table_by_panel', {
-        p_panel_token: tokenSafe,
-        p_table_number: tableNumber,
+      const { error } = await supabase.from('restaurant_tables').insert({
+        restaurant_id: restaurant.id,
+        table_number: tableNumber,
+        is_active: true,
       })
 
       if (error) throw error
-
-      // RPC yoksa fallback insert (RLS kapalıysa çalışır)
-      if (!data) {
-        const ins = await supabase.from('restaurant_tables').insert({
-          restaurant_id: restaurant.id,
-          table_number: tableNumber,
-          is_active: true,
-        })
-        if (ins.error) throw ins.error
-      }
 
       await loadAll()
     } catch (e: any) {
@@ -128,17 +119,16 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     }
   }
 
-  // 1..34 hepsini oluştur (eksikleri)
+  // Eksik 1..34 oluştur
   async function ensureAllTables() {
     if (!restaurant) return
+
     setWorking(true)
     setError('')
 
     try {
-      // Eksik numaraları bul
       const missing = allNumbers.filter((n) => !tableByNumber.get(n))
 
-      // Tek tek oluştur
       for (const n of missing) {
         // eslint-disable-next-line no-await-in-loop
         await createTable(n)
@@ -150,15 +140,15 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
   function openQr(tableToken: string) {
     const url = `${window.location.origin}/t/${tableToken}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    window.open(url, '_blank')
   }
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 pb-10 pt-6">
-      <div className="rounded-3xl bg-white/5 p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] ring-1 ring-white/10">
+      <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-4xl font-extrabold tracking-tight text-white">Masalar</div>
+            <div className="text-4xl font-bold text-white">Masalar</div>
             <div className="mt-1 text-sm text-white/50">
               {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
             </div>
@@ -167,56 +157,40 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           <button
             onClick={ensureAllTables}
             disabled={!restaurant || working || loading}
-            className={cx(
-              'rounded-2xl px-5 py-3 text-base font-semibold',
-              'bg-white/10 text-white ring-1 ring-white/10',
-              (!restaurant || working || loading) && 'opacity-40'
-            )}
+            className="rounded-2xl bg-white/10 px-5 py-3 text-white ring-1 ring-white/10 disabled:opacity-40"
           >
             Masa Ekle (1-34)
           </button>
         </div>
 
-        {/* DEBUG */}
-        <div className="mt-3 text-xs text-white/35">
-          debug: token={tokenSafe || '—'} | restaurant={restaurant ? restaurant.id : 'NULL'} | loading=
-          {String(loading)} | working={String(working)}
-        </div>
-
-        {/* ERROR */}
+        {/* HATA */}
         {!!error && (
-          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
+          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-100">
             {error}
           </div>
         )}
 
-        {/* LIST */}
+        {/* MASA LİSTESİ */}
         <div className="mt-5 overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
           {allNumbers.map((n) => {
             const row = tableByNumber.get(n)
-            const isCreated = !!row
 
             return (
               <div
                 key={n}
-                className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 last:border-b-0"
+                className="flex items-center justify-between border-b border-white/10 px-5 py-4"
               >
                 <div>
                   <div className="text-xl font-bold text-white">Masa {n}</div>
-                  <div className="text-sm text-white/55">
-                    {isCreated ? 'Oluşturuldu' : 'Henüz oluşturulmadı'}
+                  <div className="text-sm text-white/60">
+                    {row ? 'Oluşturuldu' : 'Henüz oluşturulmadı'}
                   </div>
                 </div>
 
-                {isCreated ? (
+                {row ? (
                   <button
-                    onClick={() => openQr(row!.table_token)}
-                    disabled={!restaurant || working || loading}
-                    className={cx(
-                      'rounded-2xl px-4 py-2 text-sm font-semibold',
-                      'bg-white/10 text-white ring-1 ring-white/10',
-                      (!restaurant || working || loading) && 'opacity-40'
-                    )}
+                    onClick={() => openQr(row.table_token)}
+                    className="rounded-xl bg-white/10 px-4 py-2 text-white"
                   >
                     QR Görüntüle
                   </button>
@@ -224,11 +198,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                   <button
                     onClick={() => createTable(n)}
                     disabled={!restaurant || working || loading}
-                    className={cx(
-                      'rounded-2xl px-4 py-2 text-sm font-semibold',
-                      'bg-white/10 text-white ring-1 ring-white/10',
-                      (!restaurant || working || loading) && 'opacity-40'
-                    )}
+                    className="rounded-xl bg-white/10 px-4 py-2 text-white disabled:opacity-40"
                   >
                     Oluştur
                   </button>
@@ -240,7 +210,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
         <button
           onClick={loadAll}
-          className="mt-5 w-full rounded-2xl bg-white/10 px-5 py-4 text-base font-semibold text-white ring-1 ring-white/10"
+          className="mt-5 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
         >
           Yenile
         </button>
