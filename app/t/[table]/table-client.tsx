@@ -5,15 +5,13 @@ import { supabase } from '@/lib/supabaseClient'
 
 type TableRow = {
   id: string
-  restaurant_id: string
   table_number: number
+  restaurant_id: string
   table_token: string
   is_active: boolean
 }
 
 export default function TableClient({ incoming }: { incoming: string }) {
-  const tableToken = (incoming || '').trim()
-
   const [loading, setLoading] = useState(true)
   const [invalid, setInvalid] = useState(false)
   const [row, setRow] = useState<TableRow | null>(null)
@@ -32,25 +30,37 @@ export default function TableClient({ incoming }: { incoming: string }) {
     []
   )
 
+  const isUuid = (s: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
+
   useEffect(() => {
     let alive = true
-
     ;(async () => {
       setLoading(true)
       setInvalid(false)
-      setRow(null)
 
-      const { data, error } = await supabase.rpc('get_table_by_token', { p_token: tableToken })
+      // incoming = table_token (uuid)
+      if (!isUuid(incoming)) {
+        setInvalid(true)
+        setRow(null)
+        setLoading(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('restaurant_tables')
+        .select('id, table_number, restaurant_id, table_token, is_active')
+        .eq('table_token', incoming)
+        .limit(1)
+        .maybeSingle()
 
       if (!alive) return
 
-      const found = (data && data[0]) ? (data[0] as TableRow) : null
-
-      if (error || !found || found.is_active === false) {
+      if (error || !data || data.is_active === false) {
         setInvalid(true)
         setRow(null)
       } else {
-        setRow(found)
+        setRow(data as TableRow)
       }
 
       setLoading(false)
@@ -59,18 +69,16 @@ export default function TableClient({ incoming }: { incoming: string }) {
     return () => {
       alive = false
     }
-  }, [tableToken])
+  }, [incoming])
 
   async function sendRequest(type: 'waiter' | 'bill') {
     if (!row) return
     setSending(type)
 
-    const { error } = await supabase.from('requests').insert({
-      restaurant_id: row.restaurant_id,
-      table_number: row.table_number,
-      table_token: row.table_token,
-      request_type: type,
-      status: 'waiting',
+    // ✅ SPAM ENGELİ: RPC -> aynı isteği waiting iken tekrar açmaz
+    const { data, error } = await supabase.rpc('create_request_once', {
+      p_table_token: row.table_token,
+      p_request_type: type,
     })
 
     setSending(null)
@@ -79,6 +87,8 @@ export default function TableClient({ incoming }: { incoming: string }) {
       alert(error.message)
       return
     }
+
+    // data -> ya yeni kayıt ya da zaten waiting olan kayıt
     alert('Gönderildi ✅')
   }
 
@@ -177,7 +187,11 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </div>
 
-        <button style={buttonLikeStyle} onClick={() => sendRequest('waiter')} disabled={sending !== null}>
+        <button
+          style={buttonLikeStyle}
+          onClick={() => sendRequest('waiter')}
+          disabled={sending !== null}
+        >
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
               <img src="/waiter-v2.png" alt="Garson" style={imgStyle} />
@@ -189,7 +203,11 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </button>
 
-        <button style={buttonLikeStyle} onClick={() => sendRequest('bill')} disabled={sending !== null}>
+        <button
+          style={buttonLikeStyle}
+          onClick={() => sendRequest('bill')}
+          disabled={sending !== null}
+        >
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
               <img src="/bill.png" alt="Hesap" style={imgStyle} />
@@ -201,7 +219,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </button>
 
-        <a href={`/t/${tableToken}/menu`} style={{ textDecoration: 'none' }}>
+        <a href={`/t/${row.table_token}/menu`} style={{ textDecoration: 'none' }}>
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
               <img src="/menu.png" alt="Menü" style={imgStyle} />
