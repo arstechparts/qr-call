@@ -15,9 +15,13 @@ type TableRow = {
   table_number: number
   table_token: string
   is_active: boolean
+  created_at?: string
 }
 
 export default function TablesClient({ panelToken }: { panelToken: string }) {
+  const APP_URL =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://qr-call.vercel.app'
+
   const tokenSafe = (panelToken || '').trim()
 
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
@@ -65,7 +69,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
       const t = await supabase
         .from('restaurant_tables')
-        .select('id,restaurant_id,table_number,table_token,is_active')
+        .select('id,restaurant_id,table_number,table_token,is_active,created_at')
         .eq('restaurant_id', r.data.id)
         .order('table_number', { ascending: true })
 
@@ -108,7 +112,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           is_active: true,
           table_token: newUuid(),
         })
-        .select('id,restaurant_id,table_number,table_token,is_active')
+        .select('id,restaurant_id,table_number,table_token,is_active,created_at')
         .single()
 
       if (error) throw error
@@ -127,6 +131,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
   async function createNextMissing() {
     if (!restaurant) return
+
     setWorking(true)
     setError('')
 
@@ -140,12 +145,19 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   function openQr(tableToken: string) {
-    const url = `${window.location.origin}/t/${tableToken}`
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(
+      `${APP_URL}/t/${tableToken}`
+    )}`
+    window.open(qrUrl, '_blank')
+  }
+
+  function openCustomerLink(tableToken: string) {
+    const url = `${APP_URL}/t/${tableToken}`
     window.open(url, '_blank')
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+    <div style={{ maxWidth: 760, margin: '0 auto', padding: 16 }}>
       <div
         style={{
           borderRadius: 28,
@@ -155,7 +167,15 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           border: '1px solid rgba(255,255,255,0.10)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
           <div>
             <div style={{ fontSize: 36, fontWeight: 800, color: '#fff' }}>Masalar</div>
             <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
@@ -174,6 +194,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
               color: '#fff',
               fontWeight: 700,
               opacity: !restaurant || working || loading ? 0.4 : 1,
+              cursor: !restaurant || working || loading ? 'not-allowed' : 'pointer',
             }}
           >
             Masa Ekle (1-34)
@@ -183,7 +204,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
         {error ? (
           <div
             style={{
-              marginTop: 16,
+              marginBottom: 16,
               borderRadius: 16,
               padding: 14,
               border: '1px solid rgba(255,100,100,0.35)',
@@ -198,7 +219,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
         <div
           style={{
-            marginTop: 16,
             borderRadius: 20,
             overflow: 'hidden',
             border: '1px solid rgba(255,255,255,0.10)',
@@ -217,6 +237,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                   padding: '14px 16px',
                   borderTop: '1px solid rgba(255,255,255,0.08)',
                   background: 'rgba(255,255,255,0.06)',
+                  gap: 12,
                 }}
               >
                 <div>
@@ -227,19 +248,37 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                 </div>
 
                 {row ? (
-                  <button
-                    onClick={() => openQr(row.table_token)}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: 14,
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.12)',
-                      color: '#fff',
-                      fontWeight: 700,
-                    }}
-                  >
-                    QR Görüntüle
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => openQr(row.table_token)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 14,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.12)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      QR Gör
+                    </button>
+
+                    <button
+                      onClick={() => openCustomerLink(row.table_token)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 14,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.12)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Link Aç
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={() => createTable(n)}
@@ -252,6 +291,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                       color: '#fff',
                       fontWeight: 700,
                       opacity: !restaurant || working || loading ? 0.4 : 1,
+                      cursor: !restaurant || working || loading ? 'not-allowed' : 'pointer',
                     }}
                   >
                     Oluştur
