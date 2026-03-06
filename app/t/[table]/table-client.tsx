@@ -244,7 +244,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
   return (
     <div style={bgStyle}>
       <div style={shellStyle}>
-        {/* ÜST BAR */}
         <div style={topBarStyle}>
           <div
             style={{
@@ -292,7 +291,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </a>
         </div>
 
-        {/* MENÜ */}
         <a href={`/t/${row.table_token}/menu`} style={{ textDecoration: 'none' }}>
           <div style={horizontalCardStyle}>
             <div style={cardRowStyle}>
@@ -317,7 +315,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </a>
 
-        {/* GARSON */}
         <button
           style={buttonLikeStyle}
           onClick={() => sendRequest('waiter')}
@@ -330,11 +327,13 @@ export default function TableClient({ incoming }: { incoming: string }) {
                   src="/waiter-v2.png"
                   alt="Garson"
                   style={{
-                    width: '100%',
-                    height: '100%',
+                    width: '118%',
+                    height: '118%',
                     objectFit: 'cover',
                     objectPosition: 'center 30%',
                     display: 'block',
+                    marginLeft: '-9%',
+                    marginTop: '-6%',
                   }}
                 />
               </div>
@@ -346,7 +345,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </button>
 
-        {/* HESAP */}
         <button
           style={buttonLikeStyle}
           onClick={() => sendRequest('bill')}
@@ -378,7 +376,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </button>
 
-        {/* FOOTER */}
         <div style={footerStyle}>
           Founder <b>Berk ARSLAN</b>
         </div>
