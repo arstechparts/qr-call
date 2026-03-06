@@ -68,16 +68,38 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     loadData()
   }, [])
 
-  function openQr(tableToken: string) {
-    const qr =
-      'https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=' +
+  function getQrUrl(tableToken: string) {
+    return (
+      'https://api.qrserver.com/v1/create-qr-code/?size=1200x1200&data=' +
       encodeURIComponent(`${APP}/t/${tableToken}`)
+    )
+  }
 
-    window.open(qr, '_blank')
+  function openQr(tableToken: string) {
+    window.open(getQrUrl(tableToken), '_blank')
   }
 
   function openLink(tableToken: string) {
     window.open(`${APP}/t/${tableToken}`, '_blank')
+  }
+
+  async function downloadQr(tableToken: string, tableNumber: number) {
+    try {
+      const res = await fetch(getQrUrl(tableToken))
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `masa-${tableNumber}-qr.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setError(e?.message || 'QR indirilemedi')
+    }
   }
 
   return (
@@ -170,6 +192,21 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                       }}
                     >
                       QR Gör
+                    </button>
+
+                    <button
+                      onClick={() => downloadQr(row.table_token, row.table_number)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 14,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.12)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      QR İndir
                     </button>
 
                     <button
