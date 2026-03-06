@@ -1,10 +1,5 @@
 import RequestsClient from './requests-client'
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ token: string }>
-}) {
-  const { token } = await params
-  return <RequestsClient panelToken={token} />
+export default function Page({ params }: { params: { token: string } }) {
+  return <RequestsClient panelToken={params.token} />
 }
