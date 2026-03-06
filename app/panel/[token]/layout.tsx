@@ -1,12 +1,15 @@
-import type { ReactNode } from 'react'
 import PanelClient from '@/app/panel/panel-client'
 
-export default function PanelTokenLayout({
+export default function Layout({
   children,
   params,
 }: {
-  children: ReactNode
-  params: { token: string }
+  children: React.ReactNode
+  params: Promise<{ token: string }>
 }) {
-  return <PanelClient token={params.token}>{children}</PanelClient>
+  return (
+    <PanelClient token="">
+      {children}
+    </PanelClient>
+  )
 }
