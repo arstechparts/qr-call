@@ -32,8 +32,18 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
   const tableMap = useMemo(() => {
     const m = new Map<number, Table>()
-    tables.forEach((t) => m.set(t.table_number, t))
+    tables.forEach((t) => m.set(Number(t.table_number), t))
     return m
+  }, [tables])
+
+  // Minimum 34 göster, DB'de daha fazlası varsa onları da ekrana kat
+  const visibleNumbers = useMemo(() => {
+    const maxTableNumber =
+      tables.length > 0 ? Math.max(...tables.map((t) => Number(t.table_number) || 0)) : 0
+
+    const finalMax = Math.max(34, maxTableNumber)
+
+    return Array.from({ length: finalMax }, (_, i) => i + 1)
   }, [tables])
 
   async function loadData() {
@@ -102,11 +112,9 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   function createUuid() {
-    // modern browser
     // @ts-ignore
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
 
-    // fallback
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = (Math.random() * 16) | 0
       const v = c === 'x' ? r : (r & 0x3) | 0x8
@@ -121,7 +129,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setError('')
 
     try {
-      // mevcut en büyük masa numarasını bul
       const maxTableNumber =
         tables.length > 0 ? Math.max(...tables.map((t) => Number(t.table_number) || 0)) : 0
 
@@ -143,7 +150,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
       setTables((prev) => {
         const next = [...prev, data as Table]
-        next.sort((a, b) => a.table_number - b.table_number)
+        next.sort((a, b) => Number(a.table_number) - Number(b.table_number))
         return next
       })
     } catch (e: any) {
@@ -221,8 +228,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
             border: '1px solid rgba(255,255,255,0.10)',
           }}
         >
-          {[...Array(34)].map((_, i) => {
-            const n = i + 1
+          {visibleNumbers.map((n) => {
             const row = tableMap.get(n)
 
             return (
