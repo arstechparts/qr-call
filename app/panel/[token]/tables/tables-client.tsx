@@ -20,13 +20,14 @@ type Table = {
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const APP = 'https://qr-call.vercel.app'
 
-  // DEMO için Casita'yı direkt bağladık
+  // DEMO için Casita sabit
   const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
   const DEMO_RESTAURANT_NAME = 'Casita Nişantaşı'
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(true)
+  const [working, setWorking] = useState(false)
   const [error, setError] = useState<string>('')
 
   const tableMap = useMemo(() => {
@@ -40,14 +41,12 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     setError('')
 
     try {
-      // Restaurant sabit Casita
       setRestaurant({
         id: DEMO_RESTAURANT_ID,
         name: DEMO_RESTAURANT_NAME,
         panel_token: panelToken || null,
       })
 
-      // Casita restaurant_id ile masaları çek
       const { data: t, error: tErr } = await supabase
         .from('restaurant_tables')
         .select('id,restaurant_id,table_number,table_token,is_active')
@@ -102,6 +101,58 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     }
   }
 
+  function createUuid() {
+    // modern browser
+    // @ts-ignore
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+
+    // fallback
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = (Math.random() * 16) | 0
+      const v = c === 'x' ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  async function addNextTable() {
+    if (working) return
+
+    setWorking(true)
+    setError('')
+
+    try {
+      // mevcut en büyük masa numarasını bul
+      const maxTableNumber =
+        tables.length > 0 ? Math.max(...tables.map((t) => Number(t.table_number) || 0)) : 0
+
+      const nextTableNumber = maxTableNumber + 1
+      const nextTableToken = createUuid()
+
+      const { data, error: insertError } = await supabase
+        .from('restaurant_tables')
+        .insert({
+          restaurant_id: DEMO_RESTAURANT_ID,
+          table_number: nextTableNumber,
+          table_token: nextTableToken,
+          is_active: true,
+        })
+        .select('id,restaurant_id,table_number,table_token,is_active')
+        .single()
+
+      if (insertError) throw insertError
+
+      setTables((prev) => {
+        const next = [...prev, data as Table]
+        next.sort((a, b) => a.table_number - b.table_number)
+        return next
+      })
+    } catch (e: any) {
+      setError(e?.message || 'Masa eklenemedi')
+    } finally {
+      setWorking(false)
+    }
+  }
+
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: 20 }}>
       <div
@@ -128,6 +179,23 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
               {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
             </div>
           </div>
+
+          <button
+            onClick={addNextTable}
+            disabled={loading || working}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 14,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.12)',
+              color: '#fff',
+              fontWeight: 700,
+              cursor: loading || working ? 'not-allowed' : 'pointer',
+              opacity: loading || working ? 0.5 : 1,
+            }}
+          >
+            {working ? 'Ekleniyor...' : 'Masa Ekle (+1)'}
+          </button>
         </div>
 
         {error ? (
