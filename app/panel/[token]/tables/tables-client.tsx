@@ -18,12 +18,6 @@ type TableRow = {
 }
 
 export default function TablesClient({ panelToken }: { panelToken: string }) {
-  const APP_URL =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://qr-call.vercel.app'
-
-  const RANGE_MIN = 1
-  const RANGE_MAX = 34
-
   const tokenSafe = (panelToken || '').trim()
 
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
@@ -31,10 +25,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
   const [working, setWorking] = useState<boolean>(false)
-
-  useEffect(() => {
-    if (tokenSafe) localStorage.setItem('last_panel_token', tokenSafe)
-  }, [tokenSafe])
 
   const allNumbers = useMemo(() => Array.from({ length: 34 }, (_, i) => i + 1), [])
 
@@ -150,17 +140,25 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   function openQr(tableToken: string) {
-    const url = `${APP_URL}/t/${tableToken}`
+    const url = `${window.location.origin}/t/${tableToken}`
     window.open(url, '_blank')
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl px-4 pb-10 pt-6">
-      <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-        <div className="flex items-start justify-between gap-4">
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+      <div
+        style={{
+          borderRadius: 28,
+          padding: 20,
+          background:
+            'radial-gradient(1200px 600px at 20% 10%, rgba(255,255,255,0.10), transparent 60%), linear-gradient(180deg, #0b1220 0%, #060a12 100%)',
+          border: '1px solid rgba(255,255,255,0.10)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
           <div>
-            <div className="text-4xl font-bold text-white">Masalar</div>
-            <div className="mt-1 text-sm text-white/50">
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff' }}>Masalar</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
               {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
             </div>
           </div>
@@ -168,35 +166,62 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           <button
             onClick={createNextMissing}
             disabled={!restaurant || working || loading}
-            className="rounded-2xl bg-white/10 px-5 py-3 text-white ring-1 ring-white/10 disabled:opacity-40"
+            style={{
+              padding: '14px 16px',
+              borderRadius: 18,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.10)',
+              color: '#fff',
+              fontWeight: 700,
+              opacity: !restaurant || working || loading ? 0.4 : 1,
+            }}
           >
             Masa Ekle (1-34)
           </button>
         </div>
 
-        <div className="mt-3 text-xs text-white/35">
-          debug: token={tokenSafe || '—'} | restaurant={restaurant ? 'OK' : 'NULL'} | loading=
-          {String(loading)} | working={String(working)}
-        </div>
-
-        {!!error && (
-          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-100">
+        {error ? (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 16,
+              padding: 14,
+              border: '1px solid rgba(255,100,100,0.35)',
+              background: 'rgba(255,100,100,0.12)',
+              color: '#ffd5d5',
+              fontWeight: 600,
+            }}
+          >
             {error}
           </div>
-        )}
+        ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
+        <div
+          style={{
+            marginTop: 16,
+            borderRadius: 20,
+            overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.10)',
+          }}
+        >
           {allNumbers.map((n) => {
             const row = tableByNumber.get(n)
 
             return (
               <div
                 key={n}
-                className="flex items-center justify-between border-b border-white/10 px-5 py-4"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '14px 16px',
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.06)',
+                }}
               >
                 <div>
-                  <div className="text-xl font-bold text-white">Masa {n}</div>
-                  <div className="text-sm text-white/60">
+                  <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>Masa {n}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
                     {row ? 'Oluşturuldu' : 'Henüz oluşturulmadı'}
                   </div>
                 </div>
@@ -204,7 +229,14 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                 {row ? (
                   <button
                     onClick={() => openQr(row.table_token)}
-                    className="rounded-xl bg-white/10 px-4 py-2 text-white"
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.12)',
+                      color: '#fff',
+                      fontWeight: 700,
+                    }}
                   >
                     QR Görüntüle
                   </button>
@@ -212,7 +244,15 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
                   <button
                     onClick={() => createTable(n)}
                     disabled={!restaurant || working || loading}
-                    className="rounded-xl bg-white/10 px-4 py-2 text-white disabled:opacity-40"
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.12)',
+                      color: '#fff',
+                      fontWeight: 700,
+                      opacity: !restaurant || working || loading ? 0.4 : 1,
+                    }}
                   >
                     Oluştur
                   </button>
@@ -221,13 +261,6 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
             )
           })}
         </div>
-
-        <button
-          onClick={loadAll}
-          className="mt-5 w-full rounded-2xl bg-white/10 px-5 py-4 text-white"
-        >
-          Yenile
-        </button>
       </div>
     </div>
   )
