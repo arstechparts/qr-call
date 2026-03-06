@@ -1,24 +1,12 @@
 import type { ReactNode } from 'react'
+import PanelClient from '@/app/panel/panel-client'
 
-export default async function PanelTokenLayout({
+export default function PanelTokenLayout({
   children,
   params,
 }: {
   children: ReactNode
-  params: Promise<{ token: string }>
+  params: { token: string }
 }) {
-  const { token } = await params
-
-  return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: 16 }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-        <a href={`/panel/${token}`} style={{ fontWeight: 700 }}>
-          Panel
-        </a>
-        <a href={`/panel/${token}/requests`}>İstekler</a>
-        <a href={`/panel/${token}/tables`}>Masalar</a>
-      </div>
-      {children}
-    </div>
-  )
+  return <PanelClient token={params.token}>{children}</PanelClient>
 }
