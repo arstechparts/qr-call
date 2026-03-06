@@ -177,13 +177,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
     gap: 12,
   }
 
-  const cardRowReverseStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 38%',
-    alignItems: 'stretch',
-    gap: 12,
-  }
-
   const imageBoxStyle: React.CSSProperties = {
     width: '100%',
     height: 152,
@@ -337,14 +330,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
           disabled={sending !== null}
         >
           <div style={horizontalCardStyle}>
-            <div style={cardRowReverseStyle}>
-              <div style={textColCenterStyle}>
-                <div style={titleStyle}>Hesap İste</div>
-                <div style={subtitleStyle}>
-                  {sending === 'bill' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
-                </div>
-              </div>
-
+            <div style={cardRowStyle}>
               <div style={imageBoxStyle}>
                 <img
                   src="/bill.png"
@@ -357,6 +343,13 @@ export default function TableClient({ incoming }: { incoming: string }) {
                     display: 'block',
                   }}
                 />
+              </div>
+
+              <div style={textColCenterStyle}>
+                <div style={titleStyle}>Hesap İste</div>
+                <div style={subtitleStyle}>
+                  {sending === 'bill' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
+                </div>
               </div>
             </div>
           </div>
