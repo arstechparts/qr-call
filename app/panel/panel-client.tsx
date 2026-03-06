@@ -2,8 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { ReactNode } from 'react'
 
-export default function PanelClient({ token }: { token: string }) {
+export default function PanelClient({
+  token,
+  children,
+}: {
+  token: string
+  children?: ReactNode
+}) {
   const pathname = usePathname()
 
   const items = [
@@ -13,7 +20,7 @@ export default function PanelClient({ token }: { token: string }) {
   ]
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ minHeight: '100vh', padding: 16 }}>
       <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         {items.map((item) => {
           const active =
@@ -34,6 +41,8 @@ export default function PanelClient({ token }: { token: string }) {
           )
         })}
       </div>
+
+      {children}
     </div>
   )
 }
