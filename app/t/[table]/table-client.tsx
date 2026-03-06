@@ -30,8 +30,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
       display: 'flex',
       justifyContent: 'center',
       overflowX: 'hidden',
-      fontFamily:
-        'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     }),
     []
   )
@@ -95,11 +93,48 @@ export default function TableClient({ incoming }: { incoming: string }) {
     alert('Gönderildi ✅')
   }
 
+  if (loading) {
+    return (
+      <div style={bgStyle}>
+        <div style={{ width: '100%', maxWidth: 760, color: '#fff', opacity: 0.92 }}>
+          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Casita</div>
+          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (invalid || !row) {
+    return (
+      <div style={bgStyle}>
+        <div style={{ width: '100%', maxWidth: 760 }}>
+          <div
+            style={{
+              borderRadius: 24,
+              padding: 22,
+              color: '#fff',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+            }}
+          >
+            <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Casita</div>
+            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
+            <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
+              Bu QR kapalı ya da bulunamadı.
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const shellStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: 760,
     display: 'grid',
-    gap: 12,
+    gap: 10,
+    alignContent: 'start',
   }
 
   const glassStyle: React.CSSProperties = {
@@ -111,143 +146,206 @@ export default function TableClient({ incoming }: { incoming: string }) {
     backdropFilter: 'blur(6px)',
   }
 
+  const topBarStyle: React.CSSProperties = {
+    ...glassStyle,
+    padding: '12px 16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  }
+
+  const buttonLikeStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    textAlign: 'left',
+    color: 'inherit',
+  }
+
   const horizontalCardStyle: React.CSSProperties = {
     ...glassStyle,
     padding: 12,
+    overflow: 'hidden',
   }
 
   const cardRowStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: '160px 1fr',
-    gap: 14,
-    alignItems: 'center',
+    gridTemplateColumns: '38% 1fr',
+    alignItems: 'stretch',
+    gap: 12,
   }
 
   const imageBoxStyle: React.CSSProperties = {
-    width: 160,
-    height: 160,
-    borderRadius: 20,
+    width: '100%',
+    height: 152,
+    borderRadius: 22,
     overflow: 'hidden',
+    padding: 0,
+    background: 'transparent',
+  }
+
+  const textColCenterStyle: React.CSSProperties = {
+    minHeight: 152,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    padding: '8px 6px',
   }
 
   const titleStyle: React.CSSProperties = {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: 900,
-    letterSpacing: -1,
+    letterSpacing: -0.7,
+    lineHeight: 1.05,
     textAlign: 'center',
+  }
+
+  const footerStyle: React.CSSProperties = {
+    ...glassStyle,
+    padding: '14px 16px',
+    textAlign: 'center',
+    fontSize: 15,
+    opacity: 0.95,
   }
 
   return (
     <div style={bgStyle}>
       <div style={shellStyle}>
-        {/* TOP BAR */}
-        <div
-          style={{
-            ...glassStyle,
-            padding: '12px 16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 700 }}>Casita</div>
+        {/* ÜST BAR */}
+        <div style={topBarStyle}>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 900,
+              letterSpacing: -0.8,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Casita
+          </div>
 
-          <div style={{ fontSize: 24, fontWeight: 900 }}>
-            Masa {row?.table_number}
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 900,
+              letterSpacing: -0.8,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              flex: 1,
+            }}
+          >
+            Masa {row.table_number}
           </div>
 
           <a
             href={instagramUrl}
             target="_blank"
+            rel="noreferrer"
             style={{
               textDecoration: 'none',
               color: '#fff',
-              fontSize: 14,
-              padding: '8px 14px',
+              fontSize: 13,
+              fontWeight: 700,
+              padding: '10px 14px',
               borderRadius: 999,
               background: 'rgba(255,255,255,0.10)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              whiteSpace: 'nowrap',
             }}
           >
             Casita Instagram
           </a>
         </div>
 
-        {/* MENU */}
-        <a href={`/t/${row?.table_token}/menu`} style={{ textDecoration: 'none' }}>
+        {/* MENÜ */}
+        <a href={`/t/${row.table_token}/menu`} style={{ textDecoration: 'none' }}>
           <div style={horizontalCardStyle}>
             <div style={cardRowStyle}>
               <div style={imageBoxStyle}>
                 <img
                   src="/menu.png"
+                  alt="Menü"
                   style={{
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
+                    objectPosition: 'center center',
+                    display: 'block',
                   }}
                 />
               </div>
 
-              <div style={titleStyle}>Menü Gör</div>
+              <div style={textColCenterStyle}>
+                <div style={titleStyle}>Menü Gör</div>
+              </div>
             </div>
           </div>
         </a>
 
-        {/* WAITER */}
+        {/* GARSON */}
         <button
-          style={{ background: 'none', border: 'none', padding: 0 }}
+          style={buttonLikeStyle}
           onClick={() => sendRequest('waiter')}
+          disabled={sending !== null}
         >
           <div style={horizontalCardStyle}>
             <div style={cardRowStyle}>
               <div style={imageBoxStyle}>
                 <img
                   src="/waiter-v2.png"
+                  alt="Garson"
                   style={{
-                    width: '140%',
-                    height: '140%',
+                    width: '118%',
+                    height: '118%',
                     objectFit: 'cover',
-                    objectPosition: 'center 35%',
-                    transform: 'translate(-15%, -10%)',
+                    objectPosition: 'center 30%',
+                    display: 'block',
+                    marginLeft: '-9%',
+                    marginTop: '-6%',
                   }}
                 />
               </div>
 
-              <div style={titleStyle}>Garson Çağır</div>
+              <div style={textColCenterStyle}>
+                <div style={titleStyle}>Garson Çağır</div>
+              </div>
             </div>
           </div>
         </button>
 
-        {/* BILL */}
+        {/* HESAP */}
         <button
-          style={{ background: 'none', border: 'none', padding: 0 }}
+          style={buttonLikeStyle}
           onClick={() => sendRequest('bill')}
+          disabled={sending !== null}
         >
           <div style={horizontalCardStyle}>
             <div style={cardRowStyle}>
               <div style={imageBoxStyle}>
                 <img
                   src="/bill.png"
+                  alt="Hesap"
                   style={{
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
+                    objectPosition: 'center center',
+                    display: 'block',
                   }}
                 />
               </div>
 
-              <div style={titleStyle}>Hesap İste</div>
+              <div style={textColCenterStyle}>
+                <div style={titleStyle}>Hesap İste</div>
+              </div>
             </div>
           </div>
         </button>
 
         {/* FOOTER */}
-        <div
-          style={{
-            ...glassStyle,
-            padding: 12,
-            textAlign: 'center',
-          }}
-        >
+        <div style={footerStyle}>
           Founder <b>Berk ARSLAN</b>
         </div>
       </div>
