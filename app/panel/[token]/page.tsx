@@ -1,11 +1,5 @@
-import { redirect } from 'next/navigation'
+import TablesClient from './tables-client'
 
-export default function PanelTokenIndex({
-  params,
-}: {
-  params: { token: string }
-}) {
-  const { token } = params
-
-  redirect(`/panel/${token}/requests`)
+export default function Page({ params }: { params: { token: string } }) {
+  return <TablesClient panelToken={params.token} />
 }
