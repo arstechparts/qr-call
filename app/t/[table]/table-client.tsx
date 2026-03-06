@@ -201,14 +201,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
     textAlign: 'center',
   }
 
-  const subtitleStyle: React.CSSProperties = {
-    marginTop: 10,
-    fontSize: 16,
-    opacity: 0.82,
-    textAlign: 'center',
-    lineHeight: 1.2,
-  }
-
   const footerStyle: React.CSSProperties = {
     ...glassStyle,
     padding: '14px 16px',
@@ -306,18 +298,16 @@ export default function TableClient({ incoming }: { incoming: string }) {
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
-                    objectPosition: 'center 22%',
+                    objectFit: 'contain',
+                    objectPosition: 'center center',
                     display: 'block',
+                    background: 'rgba(255,255,255,0.02)',
                   }}
                 />
               </div>
 
               <div style={textColCenterStyle}>
                 <div style={titleStyle}>Garson Çağır</div>
-                <div style={subtitleStyle}>
-                  {sending === 'waiter' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
-                </div>
               </div>
             </div>
           </div>
@@ -347,9 +337,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
 
               <div style={textColCenterStyle}>
                 <div style={titleStyle}>Hesap İste</div>
-                <div style={subtitleStyle}>
-                  {sending === 'bill' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
-                </div>
               </div>
             </div>
           </div>
