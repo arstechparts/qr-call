@@ -8,8 +8,11 @@ export default function PanelTablesBridge() {
 
   useEffect(() => {
     const last = localStorage.getItem('last_panel_token')
-    if (last) router.replace(`/panel/${last}/tables`)
-    else router.replace('/panel')
+    if (last) {
+      router.replace(`/panel/${last}/tables`)
+    } else {
+      router.replace('/panel')
+    }
   }, [router])
 
   return null
