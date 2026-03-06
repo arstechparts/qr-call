@@ -30,6 +30,8 @@ export default function TableClient({ incoming }: { incoming: string }) {
       display: 'flex',
       justifyContent: 'center',
       overflowX: 'hidden',
+      fontFamily:
+        'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     }),
     []
   )
@@ -97,7 +99,16 @@ export default function TableClient({ incoming }: { incoming: string }) {
     return (
       <div style={bgStyle}>
         <div style={{ width: '100%', maxWidth: 760, color: '#fff', opacity: 0.92 }}>
-          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Casita</div>
+          <div
+            style={{
+              fontSize: 16,
+              opacity: 0.8,
+              marginBottom: 8,
+              fontFamily: 'Georgia, "Times New Roman", serif',
+            }}
+          >
+            Casita
+          </div>
           <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
         </div>
       </div>
@@ -118,7 +129,16 @@ export default function TableClient({ incoming }: { incoming: string }) {
               boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
             }}
           >
-            <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Casita</div>
+            <div
+              style={{
+                fontSize: 16,
+                opacity: 0.8,
+                marginBottom: 8,
+                fontFamily: 'Georgia, "Times New Roman", serif',
+              }}
+            >
+              Casita
+            </div>
             <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
               Bu QR kapalı ya da bulunamadı.
@@ -195,11 +215,13 @@ export default function TableClient({ incoming }: { incoming: string }) {
   }
 
   const titleStyle: React.CSSProperties = {
-    fontSize: 30,
-    fontWeight: 900,
-    letterSpacing: -0.7,
+    fontSize: 31,
+    fontWeight: 700,
+    letterSpacing: 0.2,
     lineHeight: 1.05,
     textAlign: 'center',
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    textShadow: '0 2px 10px rgba(0,0,0,0.25)',
   }
 
   const footerStyle: React.CSSProperties = {
@@ -217,10 +239,11 @@ export default function TableClient({ incoming }: { incoming: string }) {
         <div style={topBarStyle}>
           <div
             style={{
-              fontSize: 24,
-              fontWeight: 900,
-              letterSpacing: -0.8,
+              fontSize: 26,
+              fontWeight: 700,
+              letterSpacing: -0.4,
               whiteSpace: 'nowrap',
+              fontFamily: 'Georgia, "Times New Roman", serif',
             }}
           >
             Casita
@@ -229,11 +252,12 @@ export default function TableClient({ incoming }: { incoming: string }) {
           <div
             style={{
               fontSize: 24,
-              fontWeight: 900,
-              letterSpacing: -0.8,
+              fontWeight: 800,
+              letterSpacing: -0.4,
               textAlign: 'center',
               whiteSpace: 'nowrap',
               flex: 1,
+              fontFamily: 'Georgia, "Times New Roman", serif',
             }}
           >
             Masa {row.table_number}
@@ -278,7 +302,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
               </div>
 
               <div style={textColCenterStyle}>
-                <div style={titleStyle}>Menü Gör</div>
+                <div style={titleStyle}>Menü</div>
               </div>
             </div>
           </div>
