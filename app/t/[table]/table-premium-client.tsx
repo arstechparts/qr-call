@@ -17,15 +17,19 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
   const [row, setRow] = useState<TableRow | null>(null)
   const [sending, setSending] = useState<'waiter' | 'bill' | null>(null)
 
+  const instagramUrl =
+    'https://www.instagram.com/casitarestaurants?igsh=ZHc2emt2bjRnd2F4'
+
   const bgStyle = useMemo(
     () => ({
-      minHeight: '100vh',
-      padding: 16,
+      minHeight: '100svh',
+      padding: 12,
       background:
         'radial-gradient(1200px 700px at 50% 0%, rgba(255,255,255,0.10), rgba(0,0,0,0)),' +
         'linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%)',
       display: 'flex',
       justifyContent: 'center',
+      overflow: 'hidden',
     }),
     []
   )
@@ -36,7 +40,6 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
       setLoading(true)
       setInvalid(false)
 
-      // ✅ token(TEXT) ile arıyoruz
       const { data, error } = await supabase
         .from('restaurant_tables')
         .select('id, table_number, restaurant_id, token, is_active')
@@ -85,8 +88,8 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
     return (
       <div style={bgStyle}>
         <div style={{ width: '100%', maxWidth: 520, color: '#fff', opacity: 0.9 }}>
-          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Premium</div>
-          <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
+          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Casita</div>
+          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
         </div>
       </div>
     )
@@ -106,8 +109,8 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
               boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
             }}
           >
-            <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Premium</div>
-            <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
+            <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 8 }}>Casita</div>
+            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
               Bu QR kapalı ya da bulunamadı.
             </div>
@@ -117,48 +120,39 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
     )
   }
 
-  const cardStyle: React.CSSProperties = {
+  const shellStyle: React.CSSProperties = {
+    width: '100%',
+    maxWidth: 560,
+    display: 'grid',
+    gap: 10,
+    alignContent: 'start',
+  }
+
+  const outerStyle: React.CSSProperties = {
     borderRadius: 28,
-    padding: 18,
+    padding: 12,
     color: '#fff',
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.12)',
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+    backdropFilter: 'blur(6px)',
   }
 
-  const actionCardStyle: React.CSSProperties = { ...cardStyle, padding: 22 }
-
-  const imgWrapStyle: React.CSSProperties = {
-    width: '100%',
-    borderRadius: 22,
-    overflow: 'hidden',
-    background: 'transparent',
+  const actionCardStyle: React.CSSProperties = {
+    ...outerStyle,
+    padding: 10,
   }
 
-  const imgStyle: React.CSSProperties = {
-    width: '100%',
-    height: 260,
-    objectFit: 'contain',
-    display: 'block',
-    background: 'transparent',
+  const topBarStyle: React.CSSProperties = {
+    ...outerStyle,
+    padding: '10px 14px',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
+    gap: 8,
   }
 
-  const titleStyle: React.CSSProperties = {
-    marginTop: 14,
-    fontSize: 34,
-    fontWeight: 900,
-    letterSpacing: -0.6,
-    textAlign: 'center',
-  }
-
-  const subtitleStyle: React.CSSProperties = {
-    marginTop: 6,
-    fontSize: 18,
-    opacity: 0.8,
-    textAlign: 'center',
-  }
-
-  const buttonLikeStyle: React.CSSProperties = {
+  const cardButtonStyle: React.CSSProperties = {
     width: '100%',
     background: 'transparent',
     border: 'none',
@@ -167,24 +161,129 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
     color: 'inherit',
   }
 
+  const imgWrapStyle: React.CSSProperties = {
+    width: '100%',
+    height: 150,
+    borderRadius: 20,
+    overflow: 'hidden',
+    background: 'rgba(255,255,255,0.04)',
+  }
+
+  const titleStyle: React.CSSProperties = {
+    marginTop: 10,
+    fontSize: 26,
+    fontWeight: 900,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+    lineHeight: 1.05,
+  }
+
+  const subtitleStyle: React.CSSProperties = {
+    marginTop: 4,
+    fontSize: 16,
+    opacity: 0.82,
+    textAlign: 'center',
+    lineHeight: 1.2,
+  }
+
+  const footerStyle: React.CSSProperties = {
+    ...outerStyle,
+    padding: '14px 16px',
+    textAlign: 'center',
+    fontSize: 15,
+    opacity: 0.92,
+    fontWeight: 500,
+  }
+
   return (
     <div style={bgStyle}>
-      <div style={{ width: '100%', maxWidth: 560, display: 'grid', gap: 16 }}>
-        <div style={{ ...cardStyle, padding: 16 }}>
-          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 6 }}>Premium</div>
-          <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: -1 }}>
+      <div style={shellStyle}>
+        {/* ÜST BAR */}
+        <div style={topBarStyle}>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 900,
+              letterSpacing: -0.8,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Casita
+          </div>
+
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 900,
+              letterSpacing: -0.8,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+            }}
+          >
             Masa {row.table_number}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <a
+              href={instagramUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                textDecoration: 'none',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                padding: '9px 12px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.10)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Casita Instagram
+            </a>
           </div>
         </div>
 
+        {/* MENÜ */}
+        <a href={`/t/${tableToken}/menu`} style={{ textDecoration: 'none' }}>
+          <div style={actionCardStyle}>
+            <div style={imgWrapStyle}>
+              <img
+                src="/menu.png"
+                alt="Menü"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center center',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <div style={titleStyle}>Menü Gör</div>
+          </div>
+        </a>
+
+        {/* GARSON */}
         <button
-          style={buttonLikeStyle}
+          style={cardButtonStyle}
           onClick={() => sendRequest('waiter')}
           disabled={sending !== null}
         >
           <div style={actionCardStyle}>
             <div style={imgWrapStyle}>
-              <img src="/waiter-v2.png" alt="Garson" style={imgStyle} />
+              <img
+                src="/waiter-v2.png"
+                alt="Garson"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center top',
+                  display: 'block',
+                }}
+              />
             </div>
             <div style={titleStyle}>Garson Çağır</div>
             <div style={subtitleStyle}>
@@ -193,30 +292,47 @@ export default function TablePremiumClient({ tableToken }: { tableToken: string 
           </div>
         </button>
 
+        {/* HESAP */}
         <button
-          style={buttonLikeStyle}
+          style={cardButtonStyle}
           onClick={() => sendRequest('bill')}
           disabled={sending !== null}
         >
           <div style={actionCardStyle}>
-            <div style={imgWrapStyle}>
-              <img src="/bill.png" alt="Hesap" style={imgStyle} />
+            <div
+              style={{
+                ...imgWrapStyle,
+                height: 138,
+              }}
+            >
+              <img
+                src="/bill.png"
+                alt="Hesap"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center center',
+                  display: 'block',
+                }}
+              />
             </div>
-            <div style={titleStyle}>Hesap İste</div>
+            <div
+              style={{
+                ...titleStyle,
+                fontSize: 24,
+              }}
+            >
+              Hesap İste
+            </div>
             <div style={subtitleStyle}>
               {sending === 'bill' ? 'Gönderiliyor…' : 'Lütfen butona tıklayınız'}
             </div>
           </div>
         </button>
 
-        <a href={`/t/${tableToken}/menu`} style={{ textDecoration: 'none' }}>
-          <div style={actionCardStyle}>
-            <div style={imgWrapStyle}>
-              <img src="/menu.png" alt="Menü" style={imgStyle} />
-            </div>
-            <div style={titleStyle}>Menü</div>
-          </div>
-        </a>
+        {/* FOOTER */}
+        <div style={footerStyle}>Founder <b>Berk ARSLAN</b></div>
       </div>
     </div>
   )
