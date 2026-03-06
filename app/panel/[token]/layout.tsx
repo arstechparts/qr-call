@@ -1,15 +1,13 @@
 import PanelClient from '@/app/panel/panel-client'
 
-export default function Layout({
+export default async function Layout({
   children,
   params,
 }: {
   children: React.ReactNode
   params: Promise<{ token: string }>
 }) {
-  return (
-    <PanelClient token="">
-      {children}
-    </PanelClient>
-  )
+  const { token } = await params
+
+  return <PanelClient token={token}>{children}</PanelClient>
 }
