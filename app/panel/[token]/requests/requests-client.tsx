@@ -9,7 +9,7 @@ type RequestRow = {
   request_type: string
   status: string
   created_at: string
-  restaurant_id?: string | null
+  restaurant_id: string | null
 }
 
 type RestaurantRow = {
@@ -43,6 +43,7 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
   const [waiting, setWaiting] = useState<RequestRow[]>([])
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -67,13 +68,13 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
     const { data, error } = await supabase
       .from('requests')
       .select('id, table_number, request_type, status, created_at, restaurant_id')
-      .eq('status', 'waiting')
       .eq('restaurant_id', restaurantId)
+      .eq('status', 'waiting')
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    setWaiting((data as RequestRow[]) || [])
+    setWaiting((data || []) as RequestRow[])
   }
 
   async function enableSound() {
@@ -85,7 +86,7 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
       audioRef.current.currentTime = 0
       setSoundEnabled(true)
       alert('Ses açıldı ✅')
-    } catch (e) {
+    } catch {
       alert('Ses açılamadı. Sessizde olmayın ve tekrar deneyin.')
     }
   }
@@ -99,13 +100,21 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
 
     ;(async () => {
       try {
+        setLoading(true)
+        setError('')
+
         const resolvedRestaurant = await resolveRestaurant()
+        if (cancelled) return
+
         setRestaurant(resolvedRestaurant)
         await load(resolvedRestaurant.id)
-        setError('')
+        if (cancelled) return
+
+        setLoading(false)
 
         channel = supabase
           .channel(`requests-live-${resolvedRestaurant.id}-${panelToken}`)
@@ -113,10 +122,9 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
             'postgres_changes',
             { event: 'INSERT', schema: 'public', table: 'requests' },
             async (payload: any) => {
-              if (payload?.new?.restaurant_id === resolvedRestaurant.id) {
-                await load(resolvedRestaurant.id)
-                ding()
-              }
+              if (payload?.new?.restaurant_id !== resolvedRestaurant.id) return
+              await load(resolvedRestaurant.id)
+              ding()
             }
           )
           .on(
@@ -126,18 +134,21 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
               const changedRestaurantId =
                 payload?.new?.restaurant_id || payload?.old?.restaurant_id
 
-              if (changedRestaurantId === resolvedRestaurant.id) {
-                await load(resolvedRestaurant.id)
-              }
+              if (changedRestaurantId !== resolvedRestaurant.id) return
+              await load(resolvedRestaurant.id)
             }
           )
           .subscribe()
       } catch (e: any) {
+        if (cancelled) return
         setError(e?.message || 'İstekler yüklenemedi')
+        setWaiting([])
+        setLoading(false)
       }
     })()
 
     return () => {
+      cancelled = true
       if (channel) {
         supabase.removeChannel(channel)
       }
@@ -182,7 +193,7 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
               Bekleyen İstekler ({waiting.length})
             </div>
             <div style={{ opacity: 0.7, marginTop: 4 }}>
-              {restaurant ? restaurant.name : 'Yükleniyor…'}
+              {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
             </div>
           </div>
 
@@ -217,7 +228,9 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
           </div>
         ) : null}
 
-        {waiting.length === 0 && <div style={{ opacity: 0.7 }}>Bekleyen çağrı yok</div>}
+        {!loading && waiting.length === 0 && (
+          <div style={{ opacity: 0.7 }}>Bekleyen çağrı yok</div>
+        )}
 
         {waiting.map((r) => (
           <div
