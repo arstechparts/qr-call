@@ -7,6 +7,8 @@ type Restaurant = {
   id: string
   name: string
   panel_token: string | null
+  instagram_url?: string | null
+  is_active?: boolean
 }
 
 type Table = {
@@ -20,7 +22,6 @@ type Table = {
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const APP = 'https://qr-call.vercel.app'
 
-  // DEMO için Casita sabit
   const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
   const DEMO_RESTAURANT_NAME = 'Casita Nişantaşı'
 
@@ -36,31 +37,50 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
     return m
   }, [tables])
 
-  // Minimum 34 göster, DB'de daha fazlası varsa onları da ekrana kat
   const visibleNumbers = useMemo(() => {
     const maxTableNumber =
       tables.length > 0 ? Math.max(...tables.map((t) => Number(t.table_number) || 0)) : 0
 
     const finalMax = Math.max(34, maxTableNumber)
-
     return Array.from({ length: finalMax }, (_, i) => i + 1)
   }, [tables])
+
+  async function resolveRestaurant() {
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('id, name, panel_token, instagram_url, is_active')
+      .eq('panel_token', panelToken)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+
+    if (data) {
+      return data as Restaurant
+    }
+
+    return {
+      id: DEMO_RESTAURANT_ID,
+      name: DEMO_RESTAURANT_NAME,
+      panel_token: panelToken || null,
+      instagram_url: null,
+      is_active: true,
+    } as Restaurant
+  }
 
   async function loadData() {
     setLoading(true)
     setError('')
 
     try {
-      setRestaurant({
-        id: DEMO_RESTAURANT_ID,
-        name: DEMO_RESTAURANT_NAME,
-        panel_token: panelToken || null,
-      })
+      const resolvedRestaurant = await resolveRestaurant()
+      setRestaurant(resolvedRestaurant)
 
       const { data: t, error: tErr } = await supabase
         .from('restaurant_tables')
         .select('id,restaurant_id,table_number,table_token,is_active')
-        .eq('restaurant_id', DEMO_RESTAURANT_ID)
+        .eq('restaurant_id', resolvedRestaurant.id)
         .order('table_number', { ascending: true })
 
       if (tErr) throw tErr
@@ -75,7 +95,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [panelToken])
 
   function getQrUrl(tableToken: string) {
     return (
@@ -123,7 +143,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
   }
 
   async function addNextTable() {
-    if (working) return
+    if (working || !restaurant) return
 
     setWorking(true)
     setError('')
@@ -138,7 +158,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
       const { data, error: insertError } = await supabase
         .from('restaurant_tables')
         .insert({
-          restaurant_id: DEMO_RESTAURANT_ID,
+          restaurant_id: restaurant.id,
           table_number: nextTableNumber,
           table_token: nextTableToken,
           is_active: true,
@@ -189,7 +209,7 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
           <button
             onClick={addNextTable}
-            disabled={loading || working}
+            disabled={loading || working || !restaurant}
             style={{
               padding: '12px 16px',
               borderRadius: 14,
