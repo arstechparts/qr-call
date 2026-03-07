@@ -11,6 +11,13 @@ type TableRow = {
   is_active: boolean
 }
 
+type RestaurantRow = {
+  id: string
+  name: string
+  instagram_url: string | null
+  is_active?: boolean | null
+}
+
 type CategoryRow = {
   id: string
   restaurant_id: string
@@ -32,11 +39,10 @@ type MenuItemRow = {
 }
 
 export default function MenuPageClient({ tableToken }: { tableToken: string }) {
-  const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
-
   const [loading, setLoading] = useState(true)
   const [invalid, setInvalid] = useState(false)
   const [tableRow, setTableRow] = useState<TableRow | null>(null)
+  const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [items, setItems] = useState<MenuItemRow[]>([])
 
@@ -78,30 +84,6 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     textShadow: '0 2px 10px rgba(0,0,0,0.25)',
   }
 
-  async function loadMenuForRestaurant(restaurantId: string) {
-    const { data: cData, error: cError } = await supabase
-      .from('menu_categories')
-      .select('id, restaurant_id, name, sort_order, is_active')
-      .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-
-    const { data: iData, error: iError } = await supabase
-      .from('menu_items')
-      .select(
-        'id, restaurant_id, category_id, name, description, price, sort_order, is_active, image_url'
-      )
-      .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-
-    return {
-      categories: (cData || []) as CategoryRow[],
-      items: (iData || []) as MenuItemRow[],
-      error: cError || iError,
-    }
-  }
-
   useEffect(() => {
     let alive = true
 
@@ -121,33 +103,62 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
       if (tError || !tData || tData.is_active === false) {
         setInvalid(true)
         setTableRow(null)
+        setRestaurant(null)
+        setCategories([])
+        setItems([])
         setLoading(false)
         return
       }
 
       setTableRow(tData as TableRow)
 
-      const firstRestaurantId = tData.restaurant_id
-      let menuResult = await loadMenuForRestaurant(firstRestaurantId)
-
-      if (
-        !menuResult.error &&
-        menuResult.categories.length === 0 &&
-        firstRestaurantId !== DEMO_RESTAURANT_ID
-      ) {
-        menuResult = await loadMenuForRestaurant(DEMO_RESTAURANT_ID)
-      }
+      const { data: restaurantData } = await supabase
+        .from('restaurants')
+        .select('id, name, instagram_url, is_active')
+        .eq('id', tData.restaurant_id)
+        .limit(1)
+        .maybeSingle()
 
       if (!alive) return
 
-      if (menuResult.error) {
+      if (restaurantData) {
+        setRestaurant(restaurantData as RestaurantRow)
+      } else {
+        setRestaurant({
+          id: tData.restaurant_id,
+          name: 'Casita',
+          instagram_url:
+            'https://www.instagram.com/casitarestaurants?igsh=ZHc2emt2bjRnd2F4',
+          is_active: true,
+        })
+      }
+
+      const { data: cData, error: cError } = await supabase
+        .from('menu_categories')
+        .select('id, restaurant_id, name, sort_order, is_active')
+        .eq('restaurant_id', tData.restaurant_id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      const { data: iData, error: iError } = await supabase
+        .from('menu_items')
+        .select(
+          'id, restaurant_id, category_id, name, description, price, sort_order, is_active, image_url'
+        )
+        .eq('restaurant_id', tData.restaurant_id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      if (!alive) return
+
+      if (cError || iError) {
         setInvalid(true)
         setLoading(false)
         return
       }
 
-      setCategories(menuResult.categories)
-      setItems(menuResult.items)
+      setCategories((cData || []) as CategoryRow[])
+      setItems((iData || []) as MenuItemRow[])
       setLoading(false)
     })()
 
@@ -166,6 +177,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   }
 
   const visibleCategories = categories.filter((category) => itemsOf(category.id).length > 0)
+  const restaurantName = restaurant?.name || 'Restoran'
 
   if (loading) {
     return (
@@ -173,7 +185,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
         <div style={shellStyle}>
           <div style={{ ...glassStyle, padding: '22px 18px' }}>
             <div style={{ fontSize: 20, textAlign: 'center', opacity: 0.9, ...serifStyle }}>
-              Casita
+              {restaurantName}
             </div>
             <div
               style={{
@@ -212,7 +224,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
         <div style={shellStyle}>
           <div style={{ ...glassStyle, padding: 22 }}>
             <div style={{ fontSize: 20, textAlign: 'center', opacity: 0.9, ...serifStyle }}>
-              Casita
+              {restaurantName}
             </div>
             <div
               style={{
@@ -244,7 +256,6 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   return (
     <div style={bgStyle}>
       <div style={shellStyle}>
-        {/* HEADER */}
         <div
           style={{
             ...glassStyle,
@@ -266,7 +277,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                 ...serifStyle,
               }}
             >
-              Casita
+              {restaurantName}
             </div>
 
             <div
@@ -293,14 +304,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
               }}
             >
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.16)' }} />
-              <div
-                style={{
-                  fontSize: 15,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Masa {tableRow.table_number}
-              </div>
+              <div style={{ fontSize: 15, whiteSpace: 'nowrap' }}>Masa {tableRow.table_number}</div>
               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.16)' }} />
             </div>
           </div>
@@ -329,7 +333,6 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                   padding: 14,
                 }}
               >
-                {/* CATEGORY TITLE */}
                 <div
                   style={{
                     display: 'flex',
