@@ -20,17 +20,20 @@ type MenuItemRow = {
   price: number
   sort_order: number
   is_active: boolean
+  image_url?: string | null
 }
 
 type ItemForm = {
   name: string
   description: string
   price: string
+  file: File | null
 }
 
 export default function MenuClient({ panelToken }: { panelToken: string }) {
   const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
   const DEMO_RESTAURANT_NAME = 'Casita Nişantaşı'
+  const BUCKET = 'menu-images'
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -44,12 +47,14 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     name: '',
     description: '',
     price: '',
+    file: null,
   })
 
   const [editForm, setEditForm] = useState<ItemForm>({
     name: '',
     description: '',
     price: '',
+    file: null,
   })
 
   async function loadData() {
@@ -68,7 +73,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       const { data: itemData, error: itemError } = await supabase
         .from('menu_items')
         .select(
-          'id, restaurant_id, category_id, name, description, price, sort_order, is_active'
+          'id, restaurant_id, category_id, name, description, price, sort_order, is_active, image_url'
         )
         .eq('restaurant_id', DEMO_RESTAURANT_ID)
         .order('sort_order', { ascending: true })
@@ -94,6 +99,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       name: '',
       description: '',
       price: '',
+      file: null,
     })
   }
 
@@ -103,6 +109,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       name: '',
       description: '',
       price: '',
+      file: null,
     })
   }
 
@@ -112,6 +119,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       name: item.name,
       description: item.description || '',
       price: String(item.price),
+      file: null,
     })
   }
 
@@ -121,7 +129,25 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       name: '',
       description: '',
       price: '',
+      file: null,
     })
+  }
+
+  async function uploadImage(file: File) {
+    const ext = file.name.split('.').pop() || 'jpg'
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const filePath = `products/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file, {
+        upsert: false,
+      })
+
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+    return data.publicUrl
   }
 
   async function addItem(categoryId: string) {
@@ -157,6 +183,11 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
 
       const nextSort = (lastItem?.sort_order || 0) + 1
 
+      let imageUrl: string | null = null
+      if (form.file) {
+        imageUrl = await uploadImage(form.file)
+      }
+
       const { error } = await supabase.from('menu_items').insert({
         restaurant_id: DEMO_RESTAURANT_ID,
         category_id: categoryId,
@@ -165,6 +196,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
         price: numericPrice,
         sort_order: nextSort,
         is_active: true,
+        image_url: imageUrl,
       })
 
       if (error) throw error
@@ -201,12 +233,19 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     setError('')
 
     try {
+      let imageUrl = item.image_url || null
+
+      if (editForm.file) {
+        imageUrl = await uploadImage(editForm.file)
+      }
+
       const { error } = await supabase
         .from('menu_items')
         .update({
           name: editForm.name.trim(),
           description: editForm.description.trim(),
           price: numericPrice,
+          image_url: imageUrl,
         })
         .eq('id', item.id)
 
@@ -428,6 +467,22 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                           }}
                         />
 
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              file: e.target.files?.[0] || null,
+                            }))
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '10px 0',
+                            color: '#fff',
+                          }}
+                        />
+
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           <button
                             onClick={() => addItem(cat.id)}
@@ -543,6 +598,22 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                                 }}
                               />
 
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    file: e.target.files?.[0] || null,
+                                  }))
+                                }
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 0',
+                                  color: '#fff',
+                                }}
+                              />
+
                               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                                 <button
                                   onClick={() => updateItem(item)}
@@ -586,38 +657,54 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                                 gap: 16,
                               }}
                             >
-                              <div>
-                                <div
-                                  style={{
-                                    color: '#fff',
-                                    fontWeight: 800,
-                                    fontSize: 18,
-                                  }}
-                                >
-                                  {item.name}
-                                </div>
-
-                                {item.description ? (
-                                  <div
+                              <div style={{ display: 'flex', gap: 12, flex: 1 }}>
+                                {item.image_url ? (
+                                  <img
+                                    src={item.image_url}
+                                    alt={item.name}
                                     style={{
-                                      color: 'rgba(255,255,255,0.72)',
-                                      marginTop: 6,
-                                      fontSize: 14,
-                                      lineHeight: 1.4,
+                                      width: 76,
+                                      height: 76,
+                                      objectFit: 'cover',
+                                      borderRadius: 12,
+                                      flexShrink: 0,
                                     }}
-                                  >
-                                    {item.description}
-                                  </div>
+                                  />
                                 ) : null}
 
-                                <div
-                                  style={{
-                                    color: 'rgba(255,255,255,0.5)',
-                                    marginTop: 8,
-                                    fontSize: 13,
-                                  }}
-                                >
-                                  Sıra: {item.sort_order} • {item.is_active ? 'Aktif' : 'Pasif'}
+                                <div>
+                                  <div
+                                    style={{
+                                      color: '#fff',
+                                      fontWeight: 800,
+                                      fontSize: 18,
+                                    }}
+                                  >
+                                    {item.name}
+                                  </div>
+
+                                  {item.description ? (
+                                    <div
+                                      style={{
+                                        color: 'rgba(255,255,255,0.72)',
+                                        marginTop: 6,
+                                        fontSize: 14,
+                                        lineHeight: 1.4,
+                                      }}
+                                    >
+                                      {item.description}
+                                    </div>
+                                  ) : null}
+
+                                  <div
+                                    style={{
+                                      color: 'rgba(255,255,255,0.5)',
+                                      marginTop: 8,
+                                      fontSize: 13,
+                                    }}
+                                  >
+                                    Sıra: {item.sort_order} • {item.is_active ? 'Aktif' : 'Pasif'}
+                                  </div>
                                 </div>
                               </div>
 
