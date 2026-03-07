@@ -11,6 +11,17 @@ type CategoryRow = {
   is_active: boolean
 }
 
+type MenuItemRow = {
+  id: string
+  restaurant_id: string
+  category_id: string
+  name: string
+  description: string | null
+  price: number
+  sort_order: number
+  is_active: boolean
+}
+
 type ItemForm = {
   name: string
   description: string
@@ -25,6 +36,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [items, setItems] = useState<MenuItemRow[]>([])
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null)
 
   const [form, setForm] = useState<ItemForm>({
@@ -38,15 +50,26 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     setError('')
 
     try {
-      const { data, error } = await supabase
+      const { data: catData, error: catError } = await supabase
         .from('menu_categories')
         .select('id, restaurant_id, name, sort_order, is_active')
         .eq('restaurant_id', DEMO_RESTAURANT_ID)
         .order('sort_order', { ascending: true })
 
-      if (error) throw error
+      if (catError) throw catError
 
-      setCategories((data || []) as CategoryRow[])
+      const { data: itemData, error: itemError } = await supabase
+        .from('menu_items')
+        .select(
+          'id, restaurant_id, category_id, name, description, price, sort_order, is_active'
+        )
+        .eq('restaurant_id', DEMO_RESTAURANT_ID)
+        .order('sort_order', { ascending: true })
+
+      if (itemError) throw itemError
+
+      setCategories((catData || []) as CategoryRow[])
+      setItems((itemData || []) as MenuItemRow[])
     } catch (e: any) {
       setError(e?.message || 'Bilinmeyen hata')
     } finally {
@@ -123,11 +146,20 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
 
       alert('Ürün eklendi ✅')
       closeForm()
+      await loadData()
     } catch (e: any) {
       setError(e?.message || 'Ürün eklenemedi')
     } finally {
       setSaving(null)
     }
+  }
+
+  function itemsOf(categoryId: string) {
+    return items.filter((item) => item.category_id === categoryId)
+  }
+
+  function formatPrice(price: number) {
+    return `${Number(price).toFixed(2)} ₺`
   }
 
   return (
@@ -175,158 +207,238 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
               border: '1px solid rgba(255,255,255,0.10)',
             }}
           >
-            {categories.map((cat) => (
-              <div
-                key={cat.id}
-                style={{
-                  borderTop: '1px solid rgba(255,255,255,0.08)',
-                  background: 'rgba(255,255,255,0.06)',
-                }}
-              >
+            {categories.map((cat) => {
+              const categoryItems = itemsOf(cat.id)
+
+              return (
                 <div
+                  key={cat.id}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '14px 16px',
-                    gap: 12,
+                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(255,255,255,0.06)',
                   }}
                 >
-                  <div>
-                    <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>
-                      {cat.name}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
-                      Sıra: {cat.sort_order} • {cat.is_active ? 'Aktif' : 'Pasif'}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      openCategoryId === cat.id ? closeForm() : openForm(cat.id)
-                    }
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: 12,
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.08)',
-                      color: '#fff',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {openCategoryId === cat.id ? 'Kapat' : 'Ürün Ekle'}
-                  </button>
-                </div>
-
-                {openCategoryId === cat.id ? (
                   <div
                     style={{
-                      padding: '0 16px 16px 16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 16px',
+                      gap: 12,
                     }}
                   >
-                    <div
-                      style={{
-                        borderRadius: 16,
-                        padding: 14,
-                        background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.10)',
-                        display: 'grid',
-                        gap: 10,
-                      }}
-                    >
-                      <input
-                        placeholder="Ürün adı"
-                        value={form.name}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, name: e.target.value }))
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '12px 14px',
-                          borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: '#fff',
-                          outline: 'none',
-                        }}
-                      />
-
-                      <textarea
-                        placeholder="Açıklama"
-                        value={form.description}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, description: e.target.value }))
-                        }
-                        rows={3}
-                        style={{
-                          width: '100%',
-                          padding: '12px 14px',
-                          borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: '#fff',
-                          outline: 'none',
-                          resize: 'vertical',
-                        }}
-                      />
-
-                      <input
-                        placeholder="Fiyat"
-                        value={form.price}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, price: e.target.value }))
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '12px 14px',
-                          borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: '#fff',
-                          outline: 'none',
-                        }}
-                      />
-
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => addItem(cat.id)}
-                          disabled={saving === cat.id}
-                          style={{
-                            padding: '10px 16px',
-                            borderRadius: 12,
-                            border: 'none',
-                            background: '#22c55e',
-                            color: '#fff',
-                            fontWeight: 800,
-                            cursor: saving === cat.id ? 'not-allowed' : 'pointer',
-                            opacity: saving === cat.id ? 0.7 : 1,
-                          }}
-                        >
-                          {saving === cat.id ? 'Kaydediliyor...' : 'Kaydet'}
-                        </button>
-
-                        <button
-                          onClick={closeForm}
-                          style={{
-                            padding: '10px 16px',
-                            borderRadius: 12,
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            background: 'rgba(255,255,255,0.08)',
-                            color: '#fff',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Vazgeç
-                        </button>
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>
+                        {cat.name}
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+                        Sıra: {cat.sort_order} • {cat.is_active ? 'Aktif' : 'Pasif'} • Ürün:{' '}
+                        {categoryItems.length}
                       </div>
                     </div>
+
+                    <button
+                      onClick={() =>
+                        openCategoryId === cat.id ? closeForm() : openForm(cat.id)
+                      }
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {openCategoryId === cat.id ? 'Kapat' : 'Ürün Ekle'}
+                    </button>
                   </div>
-                ) : null}
-              </div>
-            ))}
+
+                  {openCategoryId === cat.id ? (
+                    <div
+                      style={{
+                        padding: '0 16px 16px 16px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          borderRadius: 16,
+                          padding: 14,
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.10)',
+                          display: 'grid',
+                          gap: 10,
+                        }}
+                      >
+                        <input
+                          placeholder="Ürün adı"
+                          value={form.name}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, name: e.target.value }))
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#fff',
+                            outline: 'none',
+                          }}
+                        />
+
+                        <textarea
+                          placeholder="Açıklama"
+                          value={form.description}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, description: e.target.value }))
+                          }
+                          rows={3}
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#fff',
+                            outline: 'none',
+                            resize: 'vertical',
+                          }}
+                        />
+
+                        <input
+                          placeholder="Fiyat"
+                          value={form.price}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, price: e.target.value }))
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#fff',
+                            outline: 'none',
+                          }}
+                        />
+
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => addItem(cat.id)}
+                            disabled={saving === cat.id}
+                            style={{
+                              padding: '10px 16px',
+                              borderRadius: 12,
+                              border: 'none',
+                              background: '#22c55e',
+                              color: '#fff',
+                              fontWeight: 800,
+                              cursor: saving === cat.id ? 'not-allowed' : 'pointer',
+                              opacity: saving === cat.id ? 0.7 : 1,
+                            }}
+                          >
+                            {saving === cat.id ? 'Kaydediliyor...' : 'Kaydet'}
+                          </button>
+
+                          <button
+                            onClick={closeForm}
+                            style={{
+                              padding: '10px 16px',
+                              borderRadius: 12,
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              background: 'rgba(255,255,255,0.08)',
+                              color: '#fff',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Vazgeç
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {categoryItems.length > 0 ? (
+                    <div style={{ padding: '0 16px 16px 16px', display: 'grid', gap: 10 }}>
+                      {categoryItems.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            borderRadius: 14,
+                            padding: 14,
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.10)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: 16,
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                color: '#fff',
+                                fontWeight: 800,
+                                fontSize: 18,
+                              }}
+                            >
+                              {item.name}
+                            </div>
+
+                            {item.description ? (
+                              <div
+                                style={{
+                                  color: 'rgba(255,255,255,0.72)',
+                                  marginTop: 6,
+                                  fontSize: 14,
+                                  lineHeight: 1.4,
+                                }}
+                              >
+                                {item.description}
+                              </div>
+                            ) : null}
+
+                            <div
+                              style={{
+                                color: 'rgba(255,255,255,0.5)',
+                                marginTop: 8,
+                                fontSize: 13,
+                              }}
+                            >
+                              Sıra: {item.sort_order} • {item.is_active ? 'Aktif' : 'Pasif'}
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              color: '#fff',
+                              fontWeight: 900,
+                              fontSize: 18,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {formatPrice(item.price)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '0 16px 16px 16px',
+                        color: 'rgba(255,255,255,0.45)',
+                      }}
+                    >
+                      Henüz ürün yok
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
