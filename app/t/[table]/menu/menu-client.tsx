@@ -60,7 +60,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     width: '100%',
     maxWidth: 760,
     display: 'grid',
-    gap: 12,
+    gap: 14,
     alignContent: 'start',
   }
 
@@ -73,23 +73,9 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     backdropFilter: 'blur(6px)',
   }
 
-  const titleStyle: React.CSSProperties = {
-    fontSize: 34,
-    fontWeight: 700,
-    letterSpacing: 0.2,
-    lineHeight: 1.05,
-    textAlign: 'center',
+  const headerSerif: React.CSSProperties = {
     fontFamily: 'Georgia, "Times New Roman", serif',
     textShadow: '0 2px 10px rgba(0,0,0,0.25)',
-  }
-
-  const categoryTitleStyle: React.CSSProperties = {
-    fontSize: 28,
-    fontWeight: 700,
-    letterSpacing: 0.1,
-    lineHeight: 1.05,
-    fontFamily: 'Georgia, "Times New Roman", serif',
-    textAlign: 'center',
   }
 
   async function loadMenuForRestaurant(restaurantId: string) {
@@ -175,7 +161,8 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   }
 
   function formatPrice(price: number) {
-    return `${Number(price).toFixed(2)} ₺`
+    const n = Number(price)
+    return `${Number.isInteger(n) ? n.toFixed(0) : n.toFixed(2)} ₺`
   }
 
   const visibleCategories = categories.filter((category) => itemsOf(category.id).length > 0)
@@ -184,17 +171,18 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     return (
       <div style={bgStyle}>
         <div style={{ width: '100%', maxWidth: 760, color: '#fff', opacity: 0.92 }}>
-          <div
-            style={{
-              fontSize: 16,
-              opacity: 0.8,
-              marginBottom: 8,
-              fontFamily: 'Georgia, "Times New Roman", serif',
-            }}
-          >
+          <div style={{ fontSize: 18, opacity: 0.85, textAlign: 'center', ...headerSerif }}>
             Casita
           </div>
-          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 44,
+              fontWeight: 700,
+              textAlign: 'center',
+              ...headerSerif,
+            }}
+          >
             Menü yükleniyor...
           </div>
         </div>
@@ -206,26 +194,29 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     return (
       <div style={bgStyle}>
         <div style={{ width: '100%', maxWidth: 760 }}>
-          <div
-            style={{
-              ...glassStyle,
-              padding: 22,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 16,
-                opacity: 0.8,
-                marginBottom: 8,
-                fontFamily: 'Georgia, "Times New Roman", serif',
-              }}
-            >
+          <div style={{ ...glassStyle, padding: 22 }}>
+            <div style={{ fontSize: 18, opacity: 0.85, textAlign: 'center', ...headerSerif }}>
               Casita
             </div>
-            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: 40,
+                fontWeight: 700,
+                textAlign: 'center',
+                ...headerSerif,
+              }}
+            >
               Menü bulunamadı
             </div>
-            <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: 18,
+                opacity: 0.85,
+                textAlign: 'center',
+              }}
+            >
               Bu masa için menü verisi alınamadı.
             </div>
           </div>
@@ -237,34 +228,56 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   return (
     <div style={bgStyle}>
       <div style={shellStyle}>
+        {/* HEADER */}
         <div
           style={{
             ...glassStyle,
-            padding: '18px 20px',
+            padding: '20px 18px',
           }}
         >
           <div
             style={{
-              fontSize: 18,
-              opacity: 0.85,
+              fontSize: 20,
+              opacity: 0.95,
               textAlign: 'center',
-              fontFamily: 'Georgia, "Times New Roman", serif',
+              ...headerSerif,
             }}
           >
             Casita
           </div>
 
-          <div style={{ marginTop: 8, ...titleStyle }}>Menü</div>
-
           <div
             style={{
               marginTop: 8,
+              fontSize: 48,
+              fontWeight: 700,
               textAlign: 'center',
-              color: 'rgba(255,255,255,0.72)',
-              fontSize: 15,
+              lineHeight: 1,
+              ...headerSerif,
             }}
           >
-            Masa {tableRow.table_number}
+            Menü
+          </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              opacity: 0.65,
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.18)' }} />
+            <div
+              style={{
+                fontSize: 15,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Masa {tableRow.table_number}
+            </div>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.18)' }} />
           </div>
         </div>
 
@@ -288,14 +301,35 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                 key={category.id}
                 style={{
                   ...glassStyle,
-                  padding: 16,
+                  padding: 14,
                 }}
               >
-                <div style={categoryTitleStyle}>{category.name}</div>
+                {/* CATEGORY HEADER */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 14,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.14)' }} />
+                  <div
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap',
+                      ...headerSerif,
+                    }}
+                  >
+                    {category.name}
+                  </div>
+                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.14)' }} />
+                </div>
 
                 <div
                   style={{
-                    marginTop: 14,
                     display: 'grid',
                     gap: 10,
                   }}
@@ -305,50 +339,82 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                       key={item.id}
                       style={{
                         borderRadius: 18,
-                        padding: 14,
+                        padding: 10,
                         background: 'rgba(255,255,255,0.05)',
                         border: '1px solid rgba(255,255,255,0.10)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        gap: 16,
                       }}
                     >
-                      <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: item.image_url ? '86px 1fr auto' : '1fr auto',
+                          gap: 12,
+                          alignItems: 'start',
+                        }}
+                      >
+                        {item.image_url ? (
+                          <div
+                            style={{
+                              width: 86,
+                              height: 86,
+                              borderRadius: 14,
+                              overflow: 'hidden',
+                              background: 'rgba(255,255,255,0.04)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                              }}
+                            />
+                          </div>
+                        ) : null}
+
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              color: '#fff',
+                              fontWeight: 700,
+                              fontSize: 19,
+                              lineHeight: 1.15,
+                              ...headerSerif,
+                            }}
+                          >
+                            {item.name}
+                          </div>
+
+                          {item.description ? (
+                            <div
+                              style={{
+                                color: 'rgba(255,255,255,0.74)',
+                                marginTop: 6,
+                                fontSize: 14,
+                                lineHeight: 1.42,
+                              }}
+                            >
+                              {item.description}
+                            </div>
+                          ) : null}
+                        </div>
+
                         <div
                           style={{
                             color: '#fff',
                             fontWeight: 800,
-                            fontSize: 19,
-                            lineHeight: 1.2,
+                            fontSize: 22,
+                            whiteSpace: 'nowrap',
+                            lineHeight: 1.1,
+                            ...headerSerif,
                           }}
                         >
-                          {item.name}
+                          {formatPrice(item.price)}
                         </div>
-
-                        {item.description ? (
-                          <div
-                            style={{
-                              color: 'rgba(255,255,255,0.74)',
-                              marginTop: 6,
-                              fontSize: 14,
-                              lineHeight: 1.45,
-                            }}
-                          >
-                            {item.description}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div
-                        style={{
-                          color: '#fff',
-                          fontWeight: 900,
-                          fontSize: 18,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {formatPrice(item.price)}
                       </div>
                     </div>
                   ))}
