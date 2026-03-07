@@ -107,6 +107,30 @@ export default function AdminPage() {
 
       if (tablesError) throw tablesError
 
+      const defaultCategories = [
+        'Başlangıçlar',
+        'Çorbalar',
+        'Hamur İşleri',
+        'Ana Yemekler',
+        'Kiloluk Ürünler',
+        'Salatalar',
+        'İçecekler',
+        'Tatlılar',
+      ]
+
+      const categoriesToInsert = defaultCategories.map((categoryName, index) => ({
+        restaurant_id: restaurantId,
+        name: categoryName,
+        sort_order: index + 1,
+        is_active: true,
+      }))
+
+      const { error: categoriesError } = await supabase
+        .from('menu_categories')
+        .insert(categoriesToInsert)
+
+      if (categoriesError) throw categoriesError
+
       alert('Restoran oluşturuldu ✅')
 
       setName('')
