@@ -8,7 +8,7 @@ type RestaurantRow = {
   name: string
   instagram_url: string | null
   panel_token: string | null
-  is_active: boolean
+  is_active: boolean | null
   created_at: string
 }
 
@@ -17,10 +17,14 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [rows, setRows] = useState<RestaurantRow[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [instagramUrl, setInstagramUrl] = useState('')
   const [tableCount, setTableCount] = useState('20')
+
+  const [editName, setEditName] = useState('')
+  const [editInstagram, setEditInstagram] = useState('')
 
   async function loadData() {
     setLoading(true)
@@ -120,6 +124,42 @@ export default function AdminPage() {
   function openPanel(panelToken?: string | null) {
     if (!panelToken) return
     window.open(`/panel/${panelToken}/requests`, '_blank')
+  }
+
+  function openEdit(row: RestaurantRow) {
+    setEditingId(row.id)
+    setEditName(row.name || '')
+    setEditInstagram(row.instagram_url || '')
+  }
+
+  function closeEdit() {
+    setEditingId(null)
+    setEditName('')
+    setEditInstagram('')
+  }
+
+  async function saveEdit(id: string) {
+    if (!editName.trim()) {
+      alert('Restoran adı zorunlu')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .update({
+          name: editName.trim(),
+          instagram_url: editInstagram.trim() || null,
+        })
+        .eq('id', id)
+
+      if (error) throw error
+
+      closeEdit()
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Restoran güncellenemedi')
+    }
   }
 
   return (
@@ -253,45 +293,131 @@ export default function AdminPage() {
               <div
                 key={row.id}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
                   padding: '14px 16px',
                   borderTop: '1px solid rgba(255,255,255,0.08)',
                   background: 'rgba(255,255,255,0.06)',
-                  gap: 12,
                 }}
               >
-                <div>
-                  <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>
-                    {row.name}
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
-                    {row.is_active ? 'Aktif' : 'Pasif'}
-                  </div>
-                  {row.instagram_url ? (
-                    <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
-                      {row.instagram_url}
-                    </div>
-                  ) : null}
-                </div>
+                {editingId === row.id ? (
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    <input
+                      placeholder="Restoran adı"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        outline: 'none',
+                      }}
+                    />
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => openPanel(row.panel_token)}
+                    <input
+                      placeholder="Instagram linki"
+                      value={editInstagram}
+                      onChange={(e) => setEditInstagram(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        outline: 'none',
+                      }}
+                    />
+
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => saveEdit(row.id)}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: 12,
+                          border: 'none',
+                          background: '#22c55e',
+                          color: '#fff',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Kaydet
+                      </button>
+
+                      <button
+                        onClick={closeEdit}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: 12,
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#fff',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Vazgeç
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
                     style={{
-                      padding: '10px 14px',
-                      borderRadius: 12,
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.12)',
-                      color: '#fff',
-                      fontWeight: 700,
-                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 12,
                     }}
                   >
-                    Paneli Aç
-                  </button>
-                </div>
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>
+                        {row.name}
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+                        {row.is_active ? 'Aktif' : 'Pasif'}
+                      </div>
+                      {row.instagram_url ? (
+                        <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+                          {row.instagram_url}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => openEdit(row)}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: 12,
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#fff',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Düzenle
+                      </button>
+
+                      <button
+                        onClick={() => openPanel(row.panel_token)}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: 12,
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#fff',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Paneli Aç
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}
