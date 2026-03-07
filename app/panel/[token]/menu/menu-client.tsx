@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
+type RestaurantRow = {
+  id: string
+  name: string
+  panel_token: string | null
+  instagram_url?: string | null
+  is_active?: boolean
+}
+
 type CategoryRow = {
   id: string
   restaurant_id: string
@@ -35,6 +43,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   const DEMO_RESTAURANT_NAME = 'Casita Nişantaşı'
   const BUCKET = 'menu-images'
 
+  const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -57,15 +66,42 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     file: null,
   })
 
+  async function resolveRestaurant() {
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('id, name, panel_token, instagram_url, is_active')
+      .eq('panel_token', panelToken)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+
+    if (data) {
+      return data as RestaurantRow
+    }
+
+    return {
+      id: DEMO_RESTAURANT_ID,
+      name: DEMO_RESTAURANT_NAME,
+      panel_token: panelToken || null,
+      instagram_url: null,
+      is_active: true,
+    } as RestaurantRow
+  }
+
   async function loadData() {
     setLoading(true)
     setError('')
 
     try {
+      const resolvedRestaurant = await resolveRestaurant()
+      setRestaurant(resolvedRestaurant)
+
       const { data: catData, error: catError } = await supabase
         .from('menu_categories')
         .select('id, restaurant_id, name, sort_order, is_active')
-        .eq('restaurant_id', DEMO_RESTAURANT_ID)
+        .eq('restaurant_id', resolvedRestaurant.id)
         .order('sort_order', { ascending: true })
 
       if (catError) throw catError
@@ -75,7 +111,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
         .select(
           'id, restaurant_id, category_id, name, description, price, sort_order, is_active, image_url'
         )
-        .eq('restaurant_id', DEMO_RESTAURANT_ID)
+        .eq('restaurant_id', resolvedRestaurant.id)
         .order('sort_order', { ascending: true })
 
       if (itemError) throw itemError
@@ -151,6 +187,8 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   }
 
   async function addItem(categoryId: string) {
+    if (!restaurant) return
+
     if (!form.name.trim()) {
       alert('Ürün adı zorunlu')
       return
@@ -175,7 +213,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       const { data: lastItem } = await supabase
         .from('menu_items')
         .select('sort_order')
-        .eq('restaurant_id', DEMO_RESTAURANT_ID)
+        .eq('restaurant_id', restaurant.id)
         .eq('category_id', categoryId)
         .order('sort_order', { ascending: false })
         .limit(1)
@@ -189,7 +227,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       }
 
       const { error } = await supabase.from('menu_items').insert({
-        restaurant_id: DEMO_RESTAURANT_ID,
+        restaurant_id: restaurant.id,
         category_id: categoryId,
         name: form.name.trim(),
         description: form.description.trim(),
@@ -323,7 +361,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 36, fontWeight: 800 }}>Menü Yönetimi</div>
           <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
-            {DEMO_RESTAURANT_NAME}
+            {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
           </div>
         </div>
 
