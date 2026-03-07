@@ -46,7 +46,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
       padding: 12,
       background:
         'radial-gradient(1200px 700px at 50% 0%, rgba(255,255,255,0.10), rgba(0,0,0,0)),' +
-        'linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%)',
+        'linear-gradient(180deg, #0b1220 0%, #09101c 55%, #060a12 100%)',
       display: 'flex',
       justifyContent: 'center',
       overflowX: 'hidden',
@@ -67,13 +67,13 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   const glassStyle: React.CSSProperties = {
     borderRadius: 28,
     color: '#fff',
-    background: 'rgba(255,255,255,0.06)',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))',
     border: '1px solid rgba(255,255,255,0.12)',
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
-    backdropFilter: 'blur(6px)',
+    backdropFilter: 'blur(8px)',
   }
 
-  const headerSerif: React.CSSProperties = {
+  const serifStyle: React.CSSProperties = {
     fontFamily: 'Georgia, "Times New Roman", serif',
     textShadow: '0 2px 10px rgba(0,0,0,0.25)',
   }
@@ -170,20 +170,36 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   if (loading) {
     return (
       <div style={bgStyle}>
-        <div style={{ width: '100%', maxWidth: 760, color: '#fff', opacity: 0.92 }}>
-          <div style={{ fontSize: 18, opacity: 0.85, textAlign: 'center', ...headerSerif }}>
-            Casita
-          </div>
-          <div
-            style={{
-              marginTop: 10,
-              fontSize: 44,
-              fontWeight: 700,
-              textAlign: 'center',
-              ...headerSerif,
-            }}
-          >
-            Menü yükleniyor...
+        <div style={shellStyle}>
+          <div style={{ ...glassStyle, padding: '22px 18px' }}>
+            <div style={{ fontSize: 20, textAlign: 'center', opacity: 0.9, ...serifStyle }}>
+              Casita
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 44,
+                fontWeight: 700,
+                lineHeight: 1,
+                textAlign: 'center',
+                ...serifStyle,
+              }}
+            >
+              Menü
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                opacity: 0.55,
+              }}
+            >
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.16)' }} />
+              <div style={{ fontSize: 15 }}>Yükleniyor...</div>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.16)' }} />
+            </div>
           </div>
         </div>
       </div>
@@ -193,9 +209,9 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
   if (invalid || !tableRow) {
     return (
       <div style={bgStyle}>
-        <div style={{ width: '100%', maxWidth: 760 }}>
+        <div style={shellStyle}>
           <div style={{ ...glassStyle, padding: 22 }}>
-            <div style={{ fontSize: 18, opacity: 0.85, textAlign: 'center', ...headerSerif }}>
+            <div style={{ fontSize: 20, textAlign: 'center', opacity: 0.9, ...serifStyle }}>
               Casita
             </div>
             <div
@@ -204,7 +220,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                 fontSize: 40,
                 fontWeight: 700,
                 textAlign: 'center',
-                ...headerSerif,
+                ...serifStyle,
               }}
             >
               Menü bulunamadı
@@ -232,52 +248,61 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
         <div
           style={{
             ...glassStyle,
-            padding: '20px 18px',
+            overflow: 'hidden',
           }}
         >
           <div
             style={{
-              fontSize: 20,
-              opacity: 0.95,
-              textAlign: 'center',
-              ...headerSerif,
+              padding: '26px 18px 20px 18px',
+              background:
+                'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
             }}
           >
-            Casita
-          </div>
-
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 48,
-              fontWeight: 700,
-              textAlign: 'center',
-              lineHeight: 1,
-              ...headerSerif,
-            }}
-          >
-            Menü
-          </div>
-
-          <div
-            style={{
-              marginTop: 12,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              opacity: 0.65,
-            }}
-          >
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.18)' }} />
             <div
               style={{
-                fontSize: 15,
-                whiteSpace: 'nowrap',
+                fontSize: 22,
+                opacity: 0.98,
+                textAlign: 'center',
+                ...serifStyle,
               }}
             >
-              Masa {tableRow.table_number}
+              Casita
             </div>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.18)' }} />
+
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 50,
+                fontWeight: 700,
+                lineHeight: 1,
+                textAlign: 'center',
+                letterSpacing: 0.3,
+                ...serifStyle,
+              }}
+            >
+              Menü
+            </div>
+
+            <div
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                opacity: 0.6,
+              }}
+            >
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.16)' }} />
+              <div
+                style={{
+                  fontSize: 15,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Masa {tableRow.table_number}
+              </div>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.16)' }} />
+            </div>
           </div>
         </div>
 
@@ -304,7 +329,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                   padding: 14,
                 }}
               >
-                {/* CATEGORY HEADER */}
+                {/* CATEGORY TITLE */}
                 <div
                   style={{
                     display: 'flex',
@@ -316,11 +341,11 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.14)' }} />
                   <div
                     style={{
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: 700,
                       textAlign: 'center',
                       whiteSpace: 'nowrap',
-                      ...headerSerif,
+                      ...serifStyle,
                     }}
                   >
                     {category.name}
@@ -328,17 +353,12 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.14)' }} />
                 </div>
 
-                <div
-                  style={{
-                    display: 'grid',
-                    gap: 10,
-                  }}
-                >
+                <div style={{ display: 'grid', gap: 10 }}>
                   {categoryItems.map((item) => (
                     <div
                       key={item.id}
                       style={{
-                        borderRadius: 18,
+                        borderRadius: 20,
                         padding: 10,
                         background: 'rgba(255,255,255,0.05)',
                         border: '1px solid rgba(255,255,255,0.10)',
@@ -347,7 +367,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: item.image_url ? '86px 1fr auto' : '1fr auto',
+                          gridTemplateColumns: item.image_url ? '92px 1fr auto' : '1fr auto',
                           gap: 12,
                           alignItems: 'start',
                         }}
@@ -355,12 +375,13 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                         {item.image_url ? (
                           <div
                             style={{
-                              width: 86,
-                              height: 86,
-                              borderRadius: 14,
+                              width: 92,
+                              height: 92,
+                              borderRadius: 16,
                               overflow: 'hidden',
                               background: 'rgba(255,255,255,0.04)',
                               flexShrink: 0,
+                              boxShadow: '0 10px 24px rgba(0,0,0,0.18)',
                             }}
                           >
                             <img
@@ -381,9 +402,9 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                             style={{
                               color: '#fff',
                               fontWeight: 700,
-                              fontSize: 19,
+                              fontSize: 22,
                               lineHeight: 1.15,
-                              ...headerSerif,
+                              ...serifStyle,
                             }}
                           >
                             {item.name}
@@ -392,10 +413,10 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                           {item.description ? (
                             <div
                               style={{
-                                color: 'rgba(255,255,255,0.74)',
+                                color: 'rgba(255,255,255,0.76)',
                                 marginTop: 6,
                                 fontSize: 14,
-                                lineHeight: 1.42,
+                                lineHeight: 1.45,
                               }}
                             >
                               {item.description}
@@ -407,10 +428,10 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
                           style={{
                             color: '#fff',
                             fontWeight: 800,
-                            fontSize: 22,
+                            fontSize: 24,
                             whiteSpace: 'nowrap',
                             lineHeight: 1.1,
-                            ...headerSerif,
+                            ...serifStyle,
                           }}
                         >
                           {formatPrice(item.price)}
