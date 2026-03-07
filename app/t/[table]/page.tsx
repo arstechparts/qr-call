@@ -7,5 +7,5 @@ export default async function Page({
 }) {
   const { table } = await params
 
-  return <TableClient incoming={table} />
+  return <TableClient tableToken={table} />
 }
