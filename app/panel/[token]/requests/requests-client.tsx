@@ -17,7 +17,7 @@ type RestaurantRow = {
   name: string
   panel_token: string | null
   instagram_url?: string | null
-  is_active?: boolean
+  is_active?: boolean | null
 }
 
 function formatTR(iso?: string | null) {
@@ -27,7 +27,9 @@ function formatTR(iso?: string | null) {
   const tr = new Date(utc + 3 * 60 * 60 * 1000)
 
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(tr.getDate())}.${pad(tr.getMonth() + 1)}.${tr.getFullYear()} ${pad(tr.getHours())}:${pad(tr.getMinutes())}:${pad(tr.getSeconds())}`
+  return `${pad(tr.getDate())}.${pad(tr.getMonth() + 1)}.${tr.getFullYear()} ${pad(
+    tr.getHours()
+  )}:${pad(tr.getMinutes())}:${pad(tr.getSeconds())}`
 }
 
 function labelOf(type: string) {
@@ -37,9 +39,6 @@ function labelOf(type: string) {
 }
 
 export default function RequestsClient({ panelToken }: { panelToken: string }) {
-  const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
-  const DEMO_RESTAURANT_NAME = 'Casita Nişantaşı'
-
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [waiting, setWaiting] = useState<RequestRow[]>([])
   const [soundEnabled, setSoundEnabled] = useState(false)
@@ -52,49 +51,29 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
       .from('restaurants')
       .select('id, name, panel_token, instagram_url, is_active')
       .eq('panel_token', panelToken)
-      .eq('is_active', true)
       .limit(1)
       .maybeSingle()
 
     if (error) throw error
 
-    if (data) {
-      return data as RestaurantRow
+    if (!data) {
+      throw new Error(`Restoran bulunamadı. Token: ${panelToken}`)
     }
 
-    return {
-      id: DEMO_RESTAURANT_ID,
-      name: DEMO_RESTAURANT_NAME,
-      panel_token: panelToken || null,
-      instagram_url: null,
-      is_active: true,
-    } as RestaurantRow
+    return data as RestaurantRow
   }
 
-  async function load(resolvedRestaurantId?: string) {
-    try {
-      let restaurantId = resolvedRestaurantId
+  async function load(restaurantId: string) {
+    const { data, error } = await supabase
+      .from('requests')
+      .select('id, table_number, request_type, status, created_at, restaurant_id')
+      .eq('status', 'waiting')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
 
-      if (!restaurantId) {
-        const resolvedRestaurant = await resolveRestaurant()
-        setRestaurant(resolvedRestaurant)
-        restaurantId = resolvedRestaurant.id
-      }
+    if (error) throw error
 
-      const { data, error } = await supabase
-        .from('requests')
-        .select('id, table_number, request_type, status, created_at, restaurant_id')
-        .eq('status', 'waiting')
-        .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setWaiting((data as RequestRow[]) || [])
-      setError('')
-    } catch (e: any) {
-      setError(e?.message || 'İstekler yüklenemedi')
-    }
+    setWaiting((data as RequestRow[]) || [])
   }
 
   async function enableSound() {
@@ -119,56 +98,61 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
   }
 
   useEffect(() => {
-    let activeRestaurantId = ''
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
     ;(async () => {
-      const resolvedRestaurant = await resolveRestaurant()
-      setRestaurant(resolvedRestaurant)
-      activeRestaurantId = resolvedRestaurant.id
-      await load(resolvedRestaurant.id)
+      try {
+        const resolvedRestaurant = await resolveRestaurant()
+        setRestaurant(resolvedRestaurant)
+        await load(resolvedRestaurant.id)
+        setError('')
 
-      const channel = supabase
-        .channel(`requests-live-${resolvedRestaurant.id}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'requests' },
-          (payload: any) => {
-            if (payload?.new?.restaurant_id === resolvedRestaurant.id) {
-              load(resolvedRestaurant.id)
-              ding()
+        channel = supabase
+          .channel(`requests-live-${resolvedRestaurant.id}-${panelToken}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'requests' },
+            async (payload: any) => {
+              if (payload?.new?.restaurant_id === resolvedRestaurant.id) {
+                await load(resolvedRestaurant.id)
+                ding()
+              }
             }
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'requests' },
-          (payload: any) => {
-            const changedRestaurantId =
-              payload?.new?.restaurant_id || payload?.old?.restaurant_id
-            if (changedRestaurantId === resolvedRestaurant.id) {
-              load(resolvedRestaurant.id)
-            }
-          }
-        )
-        .subscribe()
+          )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'requests' },
+            async (payload: any) => {
+              const changedRestaurantId =
+                payload?.new?.restaurant_id || payload?.old?.restaurant_id
 
-      return () => {
-        supabase.removeChannel(channel)
+              if (changedRestaurantId === resolvedRestaurant.id) {
+                await load(resolvedRestaurant.id)
+              }
+            }
+          )
+          .subscribe()
+      } catch (e: any) {
+        setError(e?.message || 'İstekler yüklenemedi')
       }
     })()
 
     return () => {
-      activeRestaurantId = ''
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelToken, soundEnabled])
 
   async function complete(id: string) {
-    await supabase.from('requests').update({ status: 'completed' }).eq('id', id)
-    if (restaurant?.id) {
-      load(restaurant.id)
-    } else {
-      load()
+    try {
+      await supabase.from('requests').update({ status: 'completed' }).eq('id', id)
+
+      if (restaurant?.id) {
+        await load(restaurant.id)
+      }
+    } catch (e: any) {
+      setError(e?.message || 'İstek tamamlanamadı')
     }
   }
 
@@ -197,7 +181,7 @@ export default function RequestsClient({ panelToken }: { panelToken: string }) {
             <div style={{ fontSize: 26, fontWeight: 800 }}>
               Bekleyen İstekler ({waiting.length})
             </div>
-            <div style={{ opacity: 0.65, marginTop: 4 }}>
+            <div style={{ opacity: 0.7, marginTop: 4 }}>
               {restaurant ? restaurant.name : 'Yükleniyor…'}
             </div>
           </div>
