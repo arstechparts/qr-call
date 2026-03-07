@@ -21,7 +21,7 @@ export default function AdminPage() {
 
   const [name, setName] = useState('')
   const [instagramUrl, setInstagramUrl] = useState('')
-  const [tableCount, setTableCount] = useState('20')
+  const [tableCount, setTableCount] = useState('34')
 
   const [editName, setEditName] = useState('')
   const [editInstagram, setEditInstagram] = useState('')
@@ -135,7 +135,7 @@ export default function AdminPage() {
 
       setName('')
       setInstagramUrl('')
-      setTableCount('20')
+      setTableCount('34')
 
       await loadData()
     } catch (e: any) {
