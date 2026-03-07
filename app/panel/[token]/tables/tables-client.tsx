@@ -22,9 +22,6 @@ type Table = {
 export default function TablesClient({ panelToken }: { panelToken: string }) {
   const APP = 'https://qr-call.vercel.app'
 
-  const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
-  const DEMO_RESTAURANT_NAME = 'Casita Nişantaşı'
-
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,17 +53,11 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
     if (error) throw error
 
-    if (data) {
-      return data as Restaurant
+    if (!data) {
+      throw new Error(`Restoran bulunamadı. Token: ${panelToken}`)
     }
 
-    return {
-      id: DEMO_RESTAURANT_ID,
-      name: DEMO_RESTAURANT_NAME,
-      panel_token: panelToken || null,
-      instagram_url: null,
-      is_active: true,
-    } as Restaurant
+    return data as Restaurant
   }
 
   async function loadData() {
@@ -87,6 +78,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
 
       setTables((t || []) as Table[])
     } catch (e: any) {
+      setRestaurant(null)
+      setTables([])
       setError(e?.message || 'Bilinmeyen hata')
     } finally {
       setLoading(false)
@@ -203,7 +196,11 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
           <div>
             <div style={{ fontSize: 36, fontWeight: 800, color: '#fff' }}>Masalar</div>
             <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
-              {loading ? 'Yükleniyor…' : restaurant ? restaurant.name : '—'}
+              {loading
+                ? 'Yükleniyor…'
+                : restaurant
+                  ? `${restaurant.name} | ${restaurant.id} | ${restaurant.panel_token || '-'}`
+                  : '—'}
             </div>
           </div>
 
@@ -217,8 +214,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
               background: 'rgba(255,255,255,0.12)',
               color: '#fff',
               fontWeight: 700,
-              cursor: loading || working ? 'not-allowed' : 'pointer',
-              opacity: loading || working ? 0.5 : 1,
+              cursor: loading || working || !restaurant ? 'not-allowed' : 'pointer',
+              opacity: loading || working || !restaurant ? 0.5 : 1,
             }}
           >
             {working ? 'Ekleniyor...' : 'Masa Ekle (+1)'}
@@ -235,6 +232,8 @@ export default function TablesClient({ panelToken }: { panelToken: string }) {
               background: 'rgba(255,100,100,0.12)',
               color: '#ffd5d5',
               fontWeight: 600,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
           >
             {error}
