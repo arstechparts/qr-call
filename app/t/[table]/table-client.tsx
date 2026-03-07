@@ -203,10 +203,10 @@ export default function TableClient({ tableToken }: { tableToken: string }) {
   const topBarStyle: React.CSSProperties = {
     ...glassStyle,
     padding: '12px 16px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto',
     gap: 10,
+    alignItems: 'center',
   }
 
   const buttonLikeStyle: React.CSSProperties = {
@@ -272,28 +272,36 @@ export default function TableClient({ tableToken }: { tableToken: string }) {
         <div style={topBarStyle}>
           <div
             style={{
-              fontSize: 26,
-              fontWeight: 700,
-              letterSpacing: -0.4,
-              whiteSpace: 'nowrap',
-              fontFamily: 'Georgia, "Times New Roman", serif',
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
             }}
           >
-            {restaurantName}
-          </div>
+            <div
+              style={{
+                fontSize: 26,
+                fontWeight: 700,
+                letterSpacing: -0.4,
+                whiteSpace: 'nowrap',
+                fontFamily: 'Georgia, "Times New Roman", serif',
+              }}
+            >
+              {restaurantName}
+            </div>
 
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 800,
-              letterSpacing: -0.4,
-              textAlign: 'center',
-              whiteSpace: 'nowrap',
-              flex: 1,
-              fontFamily: 'Georgia, "Times New Roman", serif',
-            }}
-          >
-            Masa {row.table_number}
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                letterSpacing: -0.4,
+                whiteSpace: 'nowrap',
+                fontFamily: 'Georgia, "Times New Roman", serif',
+              }}
+            >
+              Masa {row.table_number}
+            </div>
           </div>
 
           <a
@@ -312,9 +320,10 @@ export default function TableClient({ tableToken }: { tableToken: string }) {
               whiteSpace: 'nowrap',
               pointerEvents: instagramUrl === '#' ? 'none' : 'auto',
               opacity: instagramUrl === '#' ? 0.5 : 1,
+              justifySelf: 'end',
             }}
           >
-            {restaurantName} Instagram
+            Instagram
           </a>
         </div>
 
