@@ -55,6 +55,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
+  const [editingCategorySort, setEditingCategorySort] = useState('')
 
   const [form, setForm] = useState<ItemForm>({
     name: '',
@@ -176,11 +177,13 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   function openCategoryEdit(category: CategoryRow) {
     setEditingCategoryId(category.id)
     setEditingCategoryName(category.name)
+    setEditingCategorySort(String(category.sort_order))
   }
 
   function closeCategoryEdit() {
     setEditingCategoryId(null)
     setEditingCategoryName('')
+    setEditingCategorySort('')
   }
 
   async function uploadImage(file: File) {
@@ -212,7 +215,8 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     setError('')
 
     try {
-      const lastSort = categories.length > 0 ? Math.max(...categories.map((c) => c.sort_order || 0)) : 0
+      const lastSort =
+        categories.length > 0 ? Math.max(...categories.map((c) => c.sort_order || 0)) : 0
 
       const { error } = await supabase.from('menu_categories').insert({
         restaurant_id: restaurant.id,
@@ -238,13 +242,28 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       return
     }
 
+    if (!editingCategorySort.trim()) {
+      alert('Sıra zorunlu')
+      return
+    }
+
+    const numericSort = Number(editingCategorySort)
+
+    if (!Number.isInteger(numericSort) || numericSort < 1) {
+      alert('Sıra en az 1 olan tam sayı olmalı')
+      return
+    }
+
     setSaving(categoryId)
     setError('')
 
     try {
       const { error } = await supabase
         .from('menu_categories')
-        .update({ name: editingCategoryName.trim() })
+        .update({
+          name: editingCategoryName.trim(),
+          sort_order: numericSort,
+        })
         .eq('id', categoryId)
 
       if (error) throw error
@@ -577,6 +596,21 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                             placeholder="Kategori adı"
                             value={editingCategoryName}
                             onChange={(e) => setEditingCategoryName(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              borderRadius: 12,
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              background: 'rgba(255,255,255,0.08)',
+                              color: '#fff',
+                              outline: 'none',
+                            }}
+                          />
+
+                          <input
+                            placeholder="Sıra"
+                            value={editingCategorySort}
+                            onChange={(e) => setEditingCategorySort(e.target.value)}
                             style={{
                               width: '100%',
                               padding: '12px 14px',
