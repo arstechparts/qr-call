@@ -11,14 +11,19 @@ type TableRow = {
   is_active: boolean
 }
 
+type RestaurantRow = {
+  id: string
+  name: string
+  instagram_url: string | null
+  is_active?: boolean | null
+}
+
 export default function TableClient({ incoming }: { incoming: string }) {
   const [loading, setLoading] = useState(true)
   const [invalid, setInvalid] = useState(false)
   const [row, setRow] = useState<TableRow | null>(null)
+  const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null)
   const [sending, setSending] = useState<'waiter' | 'bill' | null>(null)
-
-  const instagramUrl =
-    'https://www.instagram.com/casitarestaurants?igsh=ZHc2emt2bjRnd2F4'
 
   const bgStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -41,6 +46,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
 
   useEffect(() => {
     let alive = true
+
     ;(async () => {
       setLoading(true)
       setInvalid(false)
@@ -48,6 +54,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
       if (!isUuid(incoming)) {
         setInvalid(true)
         setRow(null)
+        setRestaurant(null)
         setLoading(false)
         return
       }
@@ -64,8 +71,33 @@ export default function TableClient({ incoming }: { incoming: string }) {
       if (error || !data || data.is_active === false) {
         setInvalid(true)
         setRow(null)
+        setRestaurant(null)
+        setLoading(false)
+        return
+      }
+
+      setRow(data as TableRow)
+
+      const { data: restaurantData } = await supabase
+        .from('restaurants')
+        .select('id, name, instagram_url, is_active')
+        .eq('id', data.restaurant_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (!alive) return
+
+      if (restaurantData) {
+        setRestaurant(restaurantData as RestaurantRow)
       } else {
-        setRow(data as TableRow)
+        // Eski Casita yapısı bozulmasın diye fallback
+        setRestaurant({
+          id: data.restaurant_id,
+          name: 'Casita',
+          instagram_url:
+            'https://www.instagram.com/casitarestaurants?igsh=ZHc2emt2bjRnd2F4',
+          is_active: true,
+        })
       }
 
       setLoading(false)
@@ -107,7 +139,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
               fontFamily: 'Georgia, "Times New Roman", serif',
             }}
           >
-            Casita
+            {restaurant?.name || 'Yükleniyor...'}
           </div>
           <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>Yükleniyor...</div>
         </div>
@@ -137,7 +169,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
                 fontFamily: 'Georgia, "Times New Roman", serif',
               }}
             >
-              Casita
+              {restaurant?.name || 'Restoran'}
             </div>
             <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>QR geçersiz</div>
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
@@ -148,6 +180,9 @@ export default function TableClient({ incoming }: { incoming: string }) {
       </div>
     )
   }
+
+  const restaurantName = restaurant?.name || 'Restoran'
+  const instagramUrl = restaurant?.instagram_url || '#'
 
   const shellStyle: React.CSSProperties = {
     width: '100%',
@@ -235,7 +270,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
   return (
     <div style={bgStyle}>
       <div style={shellStyle}>
-        {/* ÜST BAR */}
         <div style={topBarStyle}>
           <div
             style={{
@@ -246,7 +280,7 @@ export default function TableClient({ incoming }: { incoming: string }) {
               fontFamily: 'Georgia, "Times New Roman", serif',
             }}
           >
-            Casita
+            {restaurantName}
           </div>
 
           <div
@@ -277,13 +311,14 @@ export default function TableClient({ incoming }: { incoming: string }) {
               background: 'rgba(255,255,255,0.10)',
               border: '1px solid rgba(255,255,255,0.12)',
               whiteSpace: 'nowrap',
+              pointerEvents: instagramUrl === '#' ? 'none' : 'auto',
+              opacity: instagramUrl === '#' ? 0.5 : 1,
             }}
           >
-            Casita Instagram
+            {restaurantName} Instagram
           </a>
         </div>
 
-        {/* MENÜ */}
         <a href={`/t/${row.table_token}/menu`} style={{ textDecoration: 'none' }}>
           <div style={horizontalCardStyle}>
             <div style={cardRowStyle}>
@@ -308,7 +343,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </a>
 
-        {/* GARSON */}
         <button
           style={buttonLikeStyle}
           onClick={() => sendRequest('waiter')}
@@ -339,7 +373,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </button>
 
-        {/* HESAP */}
         <button
           style={buttonLikeStyle}
           onClick={() => sendRequest('bill')}
@@ -368,7 +401,6 @@ export default function TableClient({ incoming }: { incoming: string }) {
           </div>
         </button>
 
-        {/* FOOTER */}
         <div style={footerStyle}>
           Founder <b>Berk ARSLAN</b>
         </div>
