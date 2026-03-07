@@ -1,5 +1,10 @@
 import MenuClient from './menu-client'
 
-export default function Page({ params }: { params: { token: string } }) {
-  return <MenuClient panelToken={params.token} />
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ token: string }>
+}) {
+  const { token } = await params
+  return <MenuClient panelToken={token} />
 }
