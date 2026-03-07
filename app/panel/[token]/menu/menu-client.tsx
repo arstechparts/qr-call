@@ -52,6 +52,10 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [editingCategoryName, setEditingCategoryName] = useState('')
+
   const [form, setForm] = useState<ItemForm>({
     name: '',
     description: '',
@@ -169,6 +173,16 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     })
   }
 
+  function openCategoryEdit(category: CategoryRow) {
+    setEditingCategoryId(category.id)
+    setEditingCategoryName(category.name)
+  }
+
+  function closeCategoryEdit() {
+    setEditingCategoryId(null)
+    setEditingCategoryName('')
+  }
+
   async function uploadImage(file: File) {
     const ext = file.name.split('.').pop() || 'jpg'
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
@@ -184,6 +198,102 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
     return data.publicUrl
+  }
+
+  async function addCategory() {
+    if (!restaurant) return
+
+    if (!newCategoryName.trim()) {
+      alert('Kategori adı zorunlu')
+      return
+    }
+
+    setSaving('new-category')
+    setError('')
+
+    try {
+      const lastSort = categories.length > 0 ? Math.max(...categories.map((c) => c.sort_order || 0)) : 0
+
+      const { error } = await supabase.from('menu_categories').insert({
+        restaurant_id: restaurant.id,
+        name: newCategoryName.trim(),
+        sort_order: lastSort + 1,
+        is_active: true,
+      })
+
+      if (error) throw error
+
+      setNewCategoryName('')
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Kategori eklenemedi')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function updateCategory(categoryId: string) {
+    if (!editingCategoryName.trim()) {
+      alert('Kategori adı zorunlu')
+      return
+    }
+
+    setSaving(categoryId)
+    setError('')
+
+    try {
+      const { error } = await supabase
+        .from('menu_categories')
+        .update({ name: editingCategoryName.trim() })
+        .eq('id', categoryId)
+
+      if (error) throw error
+
+      closeCategoryEdit()
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Kategori güncellenemedi')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function deleteCategory(category: CategoryRow) {
+    const categoryItems = items.filter((item) => item.category_id === category.id)
+
+    if (categoryItems.length > 0) {
+      alert('Önce bu kategorideki ürünleri silmelisin')
+      return
+    }
+
+    const ok = confirm(`"${category.name}" kategorisini silmek istiyor musun?`)
+    if (!ok) return
+
+    setSaving(category.id)
+    setError('')
+
+    try {
+      const { error } = await supabase
+        .from('menu_categories')
+        .delete()
+        .eq('id', category.id)
+
+      if (error) throw error
+
+      if (openCategoryId === category.id) {
+        closeForm()
+      }
+
+      if (editingCategoryId === category.id) {
+        closeCategoryEdit()
+      }
+
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Kategori silinemedi')
+    } finally {
+      setSaving(null)
+    }
   }
 
   async function addItem(categoryId: string) {
@@ -381,6 +491,54 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
           </div>
         ) : null}
 
+        <div
+          style={{
+            borderRadius: 20,
+            padding: 16,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            display: 'grid',
+            gap: 10,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 800 }}>Kategori Ekle</div>
+
+          <input
+            placeholder="Yeni kategori adı"
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              outline: 'none',
+            }}
+          />
+
+          <div>
+            <button
+              onClick={addCategory}
+              disabled={saving === 'new-category'}
+              style={{
+                padding: '10px 16px',
+                borderRadius: 12,
+                border: 'none',
+                background: '#22c55e',
+                color: '#fff',
+                fontWeight: 800,
+                cursor: saving === 'new-category' ? 'not-allowed' : 'pointer',
+                opacity: saving === 'new-category' ? 0.7 : 1,
+              }}
+            >
+              {saving === 'new-category' ? 'Ekleniyor...' : 'Kategori Ekle'}
+            </button>
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ color: 'rgba(255,255,255,0.7)' }}>Yükleniyor…</div>
         ) : (
@@ -409,35 +567,129 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                       alignItems: 'center',
                       padding: '14px 16px',
                       gap: 12,
+                      flexWrap: 'wrap',
                     }}
                   >
-                    <div>
-                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>
-                        {cat.name}
-                      </div>
-                      <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
-                        Sıra: {cat.sort_order} • {cat.is_active ? 'Aktif' : 'Pasif'} • Ürün:{' '}
-                        {categoryItems.length}
-                      </div>
+                    <div style={{ flex: 1, minWidth: 220 }}>
+                      {editingCategoryId === cat.id ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <input
+                            placeholder="Kategori adı"
+                            value={editingCategoryName}
+                            onChange={(e) => setEditingCategoryName(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              borderRadius: 12,
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              background: 'rgba(255,255,255,0.08)',
+                              color: '#fff',
+                              outline: 'none',
+                            }}
+                          />
+
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => updateCategory(cat.id)}
+                              disabled={saving === cat.id}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: 12,
+                                border: 'none',
+                                background: '#22c55e',
+                                color: '#fff',
+                                fontWeight: 800,
+                                cursor: saving === cat.id ? 'not-allowed' : 'pointer',
+                                opacity: saving === cat.id ? 0.7 : 1,
+                              }}
+                            >
+                              {saving === cat.id ? 'Kaydediliyor...' : 'Kaydet'}
+                            </button>
+
+                            <button
+                              onClick={closeCategoryEdit}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: 12,
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                background: 'rgba(255,255,255,0.08)',
+                                color: '#fff',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Vazgeç
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>
+                            {cat.name}
+                          </div>
+                          <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>
+                            Sıra: {cat.sort_order} • {cat.is_active ? 'Aktif' : 'Pasif'} • Ürün:{' '}
+                            {categoryItems.length}
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    <button
-                      onClick={() =>
-                        openCategoryId === cat.id ? closeForm() : openForm(cat.id)
-                      }
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: 12,
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        background: 'rgba(255,255,255,0.08)',
-                        color: '#fff',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {openCategoryId === cat.id ? 'Kapat' : 'Ürün Ekle'}
-                    </button>
+                    {editingCategoryId !== cat.id ? (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => openCategoryEdit(cat)}
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#fff',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Kategori Düzenle
+                        </button>
+
+                        <button
+                          onClick={() => deleteCategory(cat)}
+                          disabled={saving === cat.id}
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            border: 'none',
+                            background: '#ef4444',
+                            color: '#fff',
+                            fontWeight: 800,
+                            cursor: saving === cat.id ? 'not-allowed' : 'pointer',
+                            opacity: saving === cat.id ? 0.7 : 1,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Kategori Sil
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            openCategoryId === cat.id ? closeForm() : openForm(cat.id)
+                          }
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#fff',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {openCategoryId === cat.id ? 'Kapat' : 'Ürün Ekle'}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
 
                   {openCategoryId === cat.id ? (
