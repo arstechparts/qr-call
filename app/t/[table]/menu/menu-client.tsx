@@ -32,6 +32,8 @@ type MenuItemRow = {
 }
 
 export default function MenuPageClient({ tableToken }: { tableToken: string }) {
+  const DEMO_RESTAURANT_ID = '2d0e88c2-7835-4a1b-86fe-e28e44f0b87d'
+
   const [loading, setLoading] = useState(true)
   const [invalid, setInvalid] = useState(false)
   const [tableRow, setTableRow] = useState<TableRow | null>(null)
@@ -90,6 +92,30 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     textAlign: 'center',
   }
 
+  async function loadMenuForRestaurant(restaurantId: string) {
+    const { data: cData, error: cError } = await supabase
+      .from('menu_categories')
+      .select('id, restaurant_id, name, sort_order, is_active')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+
+    const { data: iData, error: iError } = await supabase
+      .from('menu_items')
+      .select(
+        'id, restaurant_id, category_id, name, description, price, sort_order, is_active, image_url'
+      )
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+
+    return {
+      categories: (cData || []) as CategoryRow[],
+      items: (iData || []) as MenuItemRow[],
+      error: cError || iError,
+    }
+  }
+
   useEffect(() => {
     let alive = true
 
@@ -115,34 +141,27 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
 
       setTableRow(tData as TableRow)
 
-      const restaurantId = tData.restaurant_id
+      const firstRestaurantId = tData.restaurant_id
+      let menuResult = await loadMenuForRestaurant(firstRestaurantId)
 
-      const { data: cData, error: cError } = await supabase
-        .from('menu_categories')
-        .select('id, restaurant_id, name, sort_order, is_active')
-        .eq('restaurant_id', restaurantId)
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-
-      const { data: iData, error: iError } = await supabase
-        .from('menu_items')
-        .select(
-          'id, restaurant_id, category_id, name, description, price, sort_order, is_active, image_url'
-        )
-        .eq('restaurant_id', restaurantId)
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
+      if (
+        !menuResult.error &&
+        menuResult.categories.length === 0 &&
+        firstRestaurantId !== DEMO_RESTAURANT_ID
+      ) {
+        menuResult = await loadMenuForRestaurant(DEMO_RESTAURANT_ID)
+      }
 
       if (!alive) return
 
-      if (cError || iError) {
+      if (menuResult.error) {
         setInvalid(true)
         setLoading(false)
         return
       }
 
-      setCategories((cData || []) as CategoryRow[])
-      setItems((iData || []) as MenuItemRow[])
+      setCategories(menuResult.categories)
+      setItems(menuResult.items)
       setLoading(false)
     })()
 
@@ -159,6 +178,8 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
     return `${Number(price).toFixed(2)} ₺`
   }
 
+  const visibleCategories = categories.filter((category) => itemsOf(category.id).length > 0)
+
   if (loading) {
     return (
       <div style={bgStyle}>
@@ -173,7 +194,9 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
           >
             Casita
           </div>
-          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>Menü yükleniyor...</div>
+          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>
+            Menü yükleniyor...
+          </div>
         </div>
       </div>
     )
@@ -199,7 +222,9 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
             >
               Casita
             </div>
-            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>Menü bulunamadı</div>
+            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>
+              Menü bulunamadı
+            </div>
             <div style={{ marginTop: 10, fontSize: 18, opacity: 0.85 }}>
               Bu masa için menü verisi alınamadı.
             </div>
@@ -243,7 +268,7 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
           </div>
         </div>
 
-        {categories.length === 0 ? (
+        {visibleCategories.length === 0 ? (
           <div
             style={{
               ...glassStyle,
@@ -255,10 +280,8 @@ export default function MenuPageClient({ tableToken }: { tableToken: string }) {
             Henüz menü eklenmemiş
           </div>
         ) : (
-          categories.map((category) => {
+          visibleCategories.map((category) => {
             const categoryItems = itemsOf(category.id)
-
-            if (categoryItems.length === 0) return null
 
             return (
               <div
