@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 type RestaurantRow = {
@@ -13,6 +14,9 @@ type RestaurantRow = {
 }
 
 export default function AdminPage() {
+  const router = useRouter()
+
+  const [authChecked, setAuthChecked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -47,8 +51,16 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
+    const logged = localStorage.getItem('admin_logged')
+
+    if (logged !== 'yes') {
+      router.push('/admin-login')
+      return
+    }
+
+    setAuthChecked(true)
     loadData()
-  }, [])
+  }, [router])
 
   function createUuid() {
     // @ts-ignore
@@ -239,6 +251,15 @@ export default function AdminPage() {
     }
   }
 
+  function logout() {
+    localStorage.removeItem('admin_logged')
+    router.push('/admin-login')
+  }
+
+  if (!authChecked) {
+    return null
+  }
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
       <div
@@ -251,11 +272,37 @@ export default function AdminPage() {
           color: '#fff',
         }}
       >
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 36, fontWeight: 800 }}>Admin Panel</div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
-            Restoran yönetimi
+        <div
+          style={{
+            marginBottom: 18,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 36, fontWeight: 800 }}>Admin Panel</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
+              Restoran yönetimi
+            </div>
           </div>
+
+          <button
+            onClick={logout}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.12)',
+              color: '#fff',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Çıkış Yap
+          </button>
         </div>
 
         {error ? (
