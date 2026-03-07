@@ -22,7 +22,7 @@ export default function PanelClient({
 
   return (
     <div style={{ minHeight: '100vh', padding: 16, background: '#fff', color: '#111' }}>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
         {items.map((item) => {
           const active =
             pathname === item.href || pathname?.startsWith(item.href + '/')
