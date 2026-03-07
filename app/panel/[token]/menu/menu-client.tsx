@@ -38,8 +38,15 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [items, setItems] = useState<MenuItemRow[]>([])
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(null)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
   const [form, setForm] = useState<ItemForm>({
+    name: '',
+    description: '',
+    price: '',
+  })
+
+  const [editForm, setEditForm] = useState<ItemForm>({
     name: '',
     description: '',
     price: '',
@@ -99,6 +106,24 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
     })
   }
 
+  function openEdit(item: MenuItemRow) {
+    setEditingItemId(item.id)
+    setEditForm({
+      name: item.name,
+      description: item.description || '',
+      price: String(item.price),
+    })
+  }
+
+  function closeEdit() {
+    setEditingItemId(null)
+    setEditForm({
+      name: '',
+      description: '',
+      price: '',
+    })
+  }
+
   async function addItem(categoryId: string) {
     if (!form.name.trim()) {
       alert('Ürün adı zorunlu')
@@ -149,6 +174,88 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
       await loadData()
     } catch (e: any) {
       setError(e?.message || 'Ürün eklenemedi')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function updateItem(item: MenuItemRow) {
+    if (!editForm.name.trim()) {
+      alert('Ürün adı zorunlu')
+      return
+    }
+
+    if (!editForm.price.trim()) {
+      alert('Fiyat zorunlu')
+      return
+    }
+
+    const numericPrice = Number(String(editForm.price).replace(',', '.'))
+
+    if (Number.isNaN(numericPrice)) {
+      alert('Fiyat sayı olmalı')
+      return
+    }
+
+    setSaving(item.id)
+    setError('')
+
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({
+          name: editForm.name.trim(),
+          description: editForm.description.trim(),
+          price: numericPrice,
+        })
+        .eq('id', item.id)
+
+      if (error) throw error
+
+      alert('Ürün güncellendi ✅')
+      closeEdit()
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Ürün güncellenemedi')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function deleteItem(itemId: string) {
+    const ok = confirm('Bu ürünü silmek istediğine emin misin?')
+    if (!ok) return
+
+    setSaving(itemId)
+    setError('')
+
+    try {
+      const { error } = await supabase.from('menu_items').delete().eq('id', itemId)
+      if (error) throw error
+
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Ürün silinemedi')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function toggleItem(item: MenuItemRow) {
+    setSaving(item.id)
+    setError('')
+
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ is_active: !item.is_active })
+        .eq('id', item.id)
+
+      if (error) throw error
+
+      await loadData()
+    } catch (e: any) {
+      setError(e?.message || 'Durum değiştirilemedi')
     } finally {
       setSaving(null)
     }
@@ -257,11 +364,7 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                   </div>
 
                   {openCategoryId === cat.id ? (
-                    <div
-                      style={{
-                        padding: '0 16px 16px 16px',
-                      }}
-                    >
+                    <div style={{ padding: '0 16px 16px 16px' }}>
                       <div
                         style={{
                           borderRadius: 16,
@@ -372,57 +475,219 @@ export default function MenuClient({ panelToken }: { panelToken: string }) {
                             padding: 14,
                             background: 'rgba(255,255,255,0.05)',
                             border: '1px solid rgba(255,255,255,0.10)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            gap: 16,
+                            display: 'grid',
+                            gap: 12,
                           }}
                         >
-                          <div>
+                          {editingItemId === item.id ? (
+                            <div style={{ display: 'grid', gap: 10 }}>
+                              <input
+                                placeholder="Ürün adı"
+                                value={editForm.name}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    name: e.target.value,
+                                  }))
+                                }
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  borderRadius: 12,
+                                  border: '1px solid rgba(255,255,255,0.12)',
+                                  background: 'rgba(255,255,255,0.08)',
+                                  color: '#fff',
+                                  outline: 'none',
+                                }}
+                              />
+
+                              <textarea
+                                placeholder="Açıklama"
+                                value={editForm.description}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    description: e.target.value,
+                                  }))
+                                }
+                                rows={3}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  borderRadius: 12,
+                                  border: '1px solid rgba(255,255,255,0.12)',
+                                  background: 'rgba(255,255,255,0.08)',
+                                  color: '#fff',
+                                  outline: 'none',
+                                  resize: 'vertical',
+                                }}
+                              />
+
+                              <input
+                                placeholder="Fiyat"
+                                value={editForm.price}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    price: e.target.value,
+                                  }))
+                                }
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  borderRadius: 12,
+                                  border: '1px solid rgba(255,255,255,0.12)',
+                                  background: 'rgba(255,255,255,0.08)',
+                                  color: '#fff',
+                                  outline: 'none',
+                                }}
+                              />
+
+                              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={() => updateItem(item)}
+                                  disabled={saving === item.id}
+                                  style={{
+                                    padding: '10px 16px',
+                                    borderRadius: 12,
+                                    border: 'none',
+                                    background: '#22c55e',
+                                    color: '#fff',
+                                    fontWeight: 800,
+                                    cursor: saving === item.id ? 'not-allowed' : 'pointer',
+                                    opacity: saving === item.id ? 0.7 : 1,
+                                  }}
+                                >
+                                  {saving === item.id ? 'Kaydediliyor...' : 'Güncelle'}
+                                </button>
+
+                                <button
+                                  onClick={closeEdit}
+                                  style={{
+                                    padding: '10px 16px',
+                                    borderRadius: 12,
+                                    border: '1px solid rgba(255,255,255,0.15)',
+                                    background: 'rgba(255,255,255,0.08)',
+                                    color: '#fff',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Vazgeç
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
                             <div
                               style={{
-                                color: '#fff',
-                                fontWeight: 800,
-                                fontSize: 18,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                gap: 16,
                               }}
                             >
-                              {item.name}
-                            </div>
+                              <div>
+                                <div
+                                  style={{
+                                    color: '#fff',
+                                    fontWeight: 800,
+                                    fontSize: 18,
+                                  }}
+                                >
+                                  {item.name}
+                                </div>
 
-                            {item.description ? (
+                                {item.description ? (
+                                  <div
+                                    style={{
+                                      color: 'rgba(255,255,255,0.72)',
+                                      marginTop: 6,
+                                      fontSize: 14,
+                                      lineHeight: 1.4,
+                                    }}
+                                  >
+                                    {item.description}
+                                  </div>
+                                ) : null}
+
+                                <div
+                                  style={{
+                                    color: 'rgba(255,255,255,0.5)',
+                                    marginTop: 8,
+                                    fontSize: 13,
+                                  }}
+                                >
+                                  Sıra: {item.sort_order} • {item.is_active ? 'Aktif' : 'Pasif'}
+                                </div>
+                              </div>
+
                               <div
                                 style={{
-                                  color: 'rgba(255,255,255,0.72)',
-                                  marginTop: 6,
-                                  fontSize: 14,
-                                  lineHeight: 1.4,
+                                  color: '#fff',
+                                  fontWeight: 900,
+                                  fontSize: 18,
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
-                                {item.description}
+                                {formatPrice(item.price)}
                               </div>
-                            ) : null}
-
-                            <div
-                              style={{
-                                color: 'rgba(255,255,255,0.5)',
-                                marginTop: 8,
-                                fontSize: 13,
-                              }}
-                            >
-                              Sıra: {item.sort_order} • {item.is_active ? 'Aktif' : 'Pasif'}
                             </div>
-                          </div>
+                          )}
 
-                          <div
-                            style={{
-                              color: '#fff',
-                              fontWeight: 900,
-                              fontSize: 18,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {formatPrice(item.price)}
-                          </div>
+                          {editingItemId !== item.id ? (
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                              <button
+                                onClick={() => openEdit(item)}
+                                style={{
+                                  padding: '10px 14px',
+                                  borderRadius: 12,
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  background: 'rgba(255,255,255,0.08)',
+                                  color: '#fff',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Düzenle
+                              </button>
+
+                              <button
+                                onClick={() => toggleItem(item)}
+                                disabled={saving === item.id}
+                                style={{
+                                  padding: '10px 14px',
+                                  borderRadius: 12,
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  background: item.is_active
+                                    ? 'rgba(234,179,8,0.18)'
+                                    : 'rgba(34,197,94,0.18)',
+                                  color: '#fff',
+                                  fontWeight: 800,
+                                  cursor: saving === item.id ? 'not-allowed' : 'pointer',
+                                  opacity: saving === item.id ? 0.7 : 1,
+                                }}
+                              >
+                                {item.is_active ? 'Pasif Yap' : 'Aktif Yap'}
+                              </button>
+
+                              <button
+                                onClick={() => deleteItem(item.id)}
+                                disabled={saving === item.id}
+                                style={{
+                                  padding: '10px 14px',
+                                  borderRadius: 12,
+                                  border: 'none',
+                                  background: '#ef4444',
+                                  color: '#fff',
+                                  fontWeight: 800,
+                                  cursor: saving === item.id ? 'not-allowed' : 'pointer',
+                                  opacity: saving === item.id ? 0.7 : 1,
+                                }}
+                              >
+                                Sil
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                     </div>
